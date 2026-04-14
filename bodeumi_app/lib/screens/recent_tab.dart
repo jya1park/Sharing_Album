@@ -5,6 +5,17 @@ import '../services/api_service.dart';
 import '../widgets/photo_grid.dart';
 import 'photo_view_screen.dart';
 
+const _gradientDecoration = BoxDecoration(
+  gradient: LinearGradient(
+    begin: Alignment.topCenter,
+    end: Alignment.bottomCenter,
+    colors: [
+      Color(0xFFF3E8FF),
+      Color(0xFFFCE4EC),
+    ],
+  ),
+);
+
 class RecentTab extends StatefulWidget {
   final VoidCallback onFavoriteChanged;
 
@@ -63,31 +74,40 @@ class RecentTabState extends State<RecentTab> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      extendBodyBehindAppBar: true,
       appBar: AppBar(
         title: const Text('최신 업로드'),
         centerTitle: true,
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        scrolledUnderElevation: 0,
       ),
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : _photos.isEmpty
-              ? Center(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(Icons.schedule, size: 80, color: Colors.grey[300]),
-                      const SizedBox(height: 16),
-                      Text(
-                        '아직 업로드된 사진이 없습니다',
-                        style: TextStyle(fontSize: 16, color: Colors.grey[500]),
+      body: Container(
+        decoration: _gradientDecoration,
+        child: SafeArea(
+          child: _isLoading
+              ? const Center(child: CircularProgressIndicator())
+              : _photos.isEmpty
+                  ? Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(Icons.schedule, size: 80, color: Colors.grey[300]),
+                          const SizedBox(height: 16),
+                          Text(
+                            '아직 업로드된 사진이 없습니다',
+                            style: TextStyle(fontSize: 16, color: Colors.grey[500]),
+                          ),
+                        ],
                       ),
-                    ],
-                  ),
-                )
-              : PhotoGrid(
-                  photos: _photos,
-                  onTap: _openPhotoView,
-                  onRefresh: _load,
-                ),
+                    )
+                  : PhotoGrid(
+                      photos: _photos,
+                      onTap: _openPhotoView,
+                      onRefresh: _load,
+                    ),
+        ),
+      ),
     );
   }
 }

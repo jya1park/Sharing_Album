@@ -146,12 +146,12 @@ class _HomeScreenState extends State<HomeScreen> {
             child: IndexedStack(
               index: _currentTab,
               children: [
-                GalleryTab(
-                  key: _galleryKey,
-                  onFavoriteChanged: _onFavoriteChanged,
-                ),
                 RecentTab(
                   key: _recentKey,
+                  onFavoriteChanged: _onFavoriteChanged,
+                ),
+                GalleryTab(
+                  key: _galleryKey,
                   onFavoriteChanged: _onFavoriteChanged,
                 ),
                 FavoritesTab(
@@ -168,14 +168,14 @@ class _HomeScreenState extends State<HomeScreen> {
         onDestinationSelected: (index) => setState(() => _currentTab = index),
         destinations: const [
           NavigationDestination(
-            icon: Icon(Icons.photo_library_outlined),
-            selectedIcon: Icon(Icons.photo_library),
-            label: '갤러리',
-          ),
-          NavigationDestination(
             icon: Icon(Icons.schedule_outlined),
             selectedIcon: Icon(Icons.schedule),
             label: '최신',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.photo_library_outlined),
+            selectedIcon: Icon(Icons.photo_library),
+            label: '갤러리',
           ),
           NavigationDestination(
             icon: Icon(Icons.favorite_outline),

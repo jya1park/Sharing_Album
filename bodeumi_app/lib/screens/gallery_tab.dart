@@ -6,6 +6,17 @@ import '../services/api_service.dart';
 import '../widgets/photo_grid.dart';
 import 'photo_view_screen.dart';
 
+const _gradientDecoration = BoxDecoration(
+  gradient: LinearGradient(
+    begin: Alignment.topCenter,
+    end: Alignment.bottomCenter,
+    colors: [
+      Color(0xFFF3E8FF), // 연한 라벤더
+      Color(0xFFFCE4EC), // 연한 핑크
+    ],
+  ),
+);
+
 class GalleryTab extends StatefulWidget {
   final VoidCallback onFavoriteChanged;
 
@@ -105,114 +116,120 @@ class GalleryTabState extends State<GalleryTab> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      extendBodyBehindAppBar: true,
       appBar: AppBar(
-        title: const Text('보드미'),
-        centerTitle: true,
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        scrolledUnderElevation: 0,
       ),
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : _months.isEmpty
-              ? Center(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(Icons.photo_album_outlined,
-                          size: 80, color: Colors.grey[300]),
-                      const SizedBox(height: 16),
-                      Text(
-                        '아직 사진이 없습니다',
-                        style: TextStyle(fontSize: 16, color: Colors.grey[500]),
-                      ),
-                    ],
-                  ),
-                )
-              : Column(
-                  children: [
-                    // Month indicator
-                    Padding(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 16, vertical: 8),
-                      child: Row(
+      body: Container(
+        decoration: _gradientDecoration,
+        child: SafeArea(
+          child: _isLoading
+              ? const Center(child: CircularProgressIndicator())
+              : _months.isEmpty
+                  ? Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          IconButton(
-                            icon: const Icon(Icons.chevron_left),
-                            onPressed: _currentPage < _months.length - 1
-                                ? () => _pageController.nextPage(
-                                      duration:
-                                          const Duration(milliseconds: 300),
-                                      curve: Curves.easeInOut,
-                                    )
-                                : null,
-                          ),
-                          Expanded(
-                            child: Text(
-                              _formatMonth(_months[_currentPage]),
-                              textAlign: TextAlign.center,
-                              style: Theme.of(context)
-                                  .textTheme
-                                  .titleLarge
-                                  ?.copyWith(fontWeight: FontWeight.bold),
-                            ),
-                          ),
-                          IconButton(
-                            icon: const Icon(Icons.chevron_right),
-                            onPressed: _currentPage > 0
-                                ? () => _pageController.previousPage(
-                                      duration:
-                                          const Duration(milliseconds: 300),
-                                      curve: Curves.easeInOut,
-                                    )
-                                : null,
+                          Icon(Icons.photo_album_outlined,
+                              size: 80, color: Colors.grey[300]),
+                          const SizedBox(height: 16),
+                          Text(
+                            '아직 사진이 없습니다',
+                            style: TextStyle(fontSize: 16, color: Colors.grey[500]),
                           ),
                         ],
                       ),
-                    ),
-
-                    // Swipeable month pages
-                    Expanded(
-                      child: PageView.builder(
-                        controller: _pageController,
-                        reverse: true, // newest month first, swipe right for older
-                        itemCount: _months.length,
-                        onPageChanged: (index) {
-                          setState(() => _currentPage = index);
-                          _loadPhotosForPage(index);
-                          // Preload adjacent pages
-                          _loadPhotosForPage(index - 1);
-                          _loadPhotosForPage(index + 1);
-                        },
-                        itemBuilder: (context, index) {
-                          final month = _months[index];
-                          final photos = _photoCache[month];
-
-                          if (photos == null) {
-                            return const Center(
-                                child: CircularProgressIndicator());
-                          }
-
-                          if (photos.isEmpty) {
-                            return Center(
-                              child: Text(
-                                '이 달에는 사진이 없습니다',
-                                style: TextStyle(
-                                    fontSize: 16, color: Colors.grey[500]),
+                    )
+                  : Column(
+                      children: [
+                        // Month indicator
+                        Padding(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 16, vertical: 8),
+                          child: Row(
+                            children: [
+                              IconButton(
+                                icon: const Icon(Icons.chevron_left),
+                                onPressed: _currentPage < _months.length - 1
+                                    ? () => _pageController.nextPage(
+                                          duration:
+                                              const Duration(milliseconds: 300),
+                                          curve: Curves.easeInOut,
+                                        )
+                                    : null,
                               ),
-                            );
-                          }
+                              Expanded(
+                                child: Text(
+                                  _formatMonth(_months[_currentPage]),
+                                  textAlign: TextAlign.center,
+                                  style: Theme.of(context)
+                                      .textTheme
+                                      .titleLarge
+                                      ?.copyWith(fontWeight: FontWeight.bold),
+                                ),
+                              ),
+                              IconButton(
+                                icon: const Icon(Icons.chevron_right),
+                                onPressed: _currentPage > 0
+                                    ? () => _pageController.previousPage(
+                                          duration:
+                                              const Duration(milliseconds: 300),
+                                          curve: Curves.easeInOut,
+                                        )
+                                    : null,
+                              ),
+                            ],
+                          ),
+                        ),
 
-                          return PhotoGrid(
-                            photos: photos,
-                            onTap: (i) => _openPhotoView(photos, i),
-                            onRefresh: () async {
-                              _photoCache.remove(month);
-                              await _loadPhotosForPage(index);
+                        // Swipeable month pages
+                        Expanded(
+                          child: PageView.builder(
+                            controller: _pageController,
+                            reverse: true,
+                            itemCount: _months.length,
+                            onPageChanged: (index) {
+                              setState(() => _currentPage = index);
+                              _loadPhotosForPage(index);
+                              _loadPhotosForPage(index - 1);
+                              _loadPhotosForPage(index + 1);
                             },
-                          );
-                        },
-                      ),
+                            itemBuilder: (context, index) {
+                              final month = _months[index];
+                              final photos = _photoCache[month];
+
+                              if (photos == null) {
+                                return const Center(
+                                    child: CircularProgressIndicator());
+                              }
+
+                              if (photos.isEmpty) {
+                                return Center(
+                                  child: Text(
+                                    '이 달에는 사진이 없습니다',
+                                    style: TextStyle(
+                                        fontSize: 16, color: Colors.grey[500]),
+                                  ),
+                                );
+                              }
+
+                              return PhotoGrid(
+                                photos: photos,
+                                onTap: (i) => _openPhotoView(photos, i),
+                                onRefresh: () async {
+                                  _photoCache.remove(month);
+                                  await _loadPhotosForPage(index);
+                                },
+                              );
+                            },
+                          ),
+                        ),
+                      ],
                     ),
-                  ],
-                ),
+        ),
+      ),
     );
   }
 }
