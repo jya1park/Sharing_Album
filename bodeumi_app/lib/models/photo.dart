@@ -7,6 +7,7 @@ class Photo {
   final DateTime? takenAt;
   final DateTime uploadedAt;
   final String monthFolder;
+  final bool isFavorite;
 
   Photo({
     required this.id,
@@ -17,6 +18,7 @@ class Photo {
     this.takenAt,
     required this.uploadedAt,
     required this.monthFolder,
+    this.isFavorite = false,
   });
 
   factory Photo.fromJson(Map<String, dynamic> json) {
@@ -29,6 +31,21 @@ class Photo {
       takenAt: json['taken_at'] != null ? DateTime.parse(json['taken_at']) : null,
       uploadedAt: DateTime.parse(json['uploaded_at']),
       monthFolder: json['month_folder'],
+      isFavorite: json['is_favorite'] ?? false,
+    );
+  }
+
+  Photo copyWith({bool? isFavorite}) {
+    return Photo(
+      id: id,
+      originalFilename: originalFilename,
+      thumbnailUrl: thumbnailUrl,
+      originalUrl: originalUrl,
+      fileSize: fileSize,
+      takenAt: takenAt,
+      uploadedAt: uploadedAt,
+      monthFolder: monthFolder,
+      isFavorite: isFavorite ?? this.isFavorite,
     );
   }
 }

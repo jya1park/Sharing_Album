@@ -2,12 +2,11 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
-import 'package:intl/intl.dart';
-import 'package:cached_network_image/cached_network_image.dart';
 
-import '../models/photo.dart';
 import '../services/api_service.dart';
-import 'photo_view_screen.dart';
+import 'gallery_tab.dart';
+import 'recent_tab.dart';
+import 'favorites_tab.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -17,55 +16,15 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
-  List<String> _months = [];
-  String? _selectedMonth;
-  List<Photo> _photos = [];
-  bool _isLoading = true;
+  int _currentTab = 0;
   bool _isUploading = false;
   int _uploadTotal = 0;
   int _uploadDone = 0;
-  int _uploadSkipped = 0;
 
-  @override
-  void initState() {
-    super.initState();
-    _loadMonths();
-  }
-
-  Future<void> _loadMonths() async {
-    setState(() => _isLoading = true);
-    try {
-      final months = await ApiService.getMonths();
-      setState(() {
-        _months = months;
-        if (months.isNotEmpty) {
-          _selectedMonth = months.first;
-        }
-      });
-      if (_selectedMonth != null) {
-        await _loadPhotos(_selectedMonth!);
-      } else {
-        setState(() => _isLoading = false);
-      }
-    } catch (e) {
-      setState(() => _isLoading = false);
-      if (mounted) _showError('서버 연결 실패: $e');
-    }
-  }
-
-  Future<void> _loadPhotos(String month) async {
-    setState(() => _isLoading = true);
-    try {
-      final photos = await ApiService.getPhotos(month);
-      setState(() {
-        _photos = photos;
-        _isLoading = false;
-      });
-    } catch (e) {
-      setState(() => _isLoading = false);
-      if (mounted) _showError('사진 로딩 실패');
-    }
-  }
+  // Keys to trigger reload on child tabs
+  final _galleryKey = GlobalKey<GalleryTabState>();
+  final _recentKey = GlobalKey<RecentTabState>();
+  final _favoritesKey = GlobalKey<FavoritesTabState>();
 
   Future<void> _takePhoto() async {
     final picker = ImagePicker();
@@ -89,16 +48,16 @@ class _HomeScreenState extends State<HomeScreen> {
       _isUploading = true;
       _uploadTotal = files.length;
       _uploadDone = 0;
-      _uploadSkipped = 0;
     });
 
+    int skipped = 0;
     int failed = 0;
 
     for (final file in files) {
       try {
         await ApiService.uploadPhoto(File(file.path));
       } on DuplicatePhotoException {
-        _uploadSkipped++;
+        skipped++;
       } catch (e) {
         failed++;
       }
@@ -108,10 +67,10 @@ class _HomeScreenState extends State<HomeScreen> {
     setState(() => _isUploading = false);
 
     if (mounted) {
-      final uploaded = _uploadTotal - _uploadSkipped - failed;
+      final uploaded = _uploadTotal - skipped - failed;
       final parts = <String>[];
       if (uploaded > 0) parts.add('$uploaded장 업로드 완료');
-      if (_uploadSkipped > 0) parts.add('$_uploadSkipped장 중복');
+      if (skipped > 0) parts.add('$skipped장 중복');
       if (failed > 0) parts.add('$failed장 실패');
 
       ScaffoldMessenger.of(context).showSnackBar(
@@ -122,22 +81,9 @@ class _HomeScreenState extends State<HomeScreen> {
       );
     }
 
-    await _loadMonths();
-  }
-
-  void _showError(String message) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(message), backgroundColor: Colors.red),
-    );
-  }
-
-  String _formatMonth(String month) {
-    try {
-      final date = DateFormat('yyyy-MM').parse(month);
-      return DateFormat('yyyy년 M월').format(date);
-    } catch (_) {
-      return month;
-    }
+    _galleryKey.currentState?.reload();
+    _recentKey.currentState?.reload();
+    _favoritesKey.currentState?.reload();
   }
 
   void _showUploadOptions() {
@@ -169,38 +115,17 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
+  void _onFavoriteChanged() {
+    _favoritesKey.currentState?.reload();
+    _galleryKey.currentState?.reload();
+    _recentKey.currentState?.reload();
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('보드미'),
-        centerTitle: true,
-        actions: [
-          if (_months.isNotEmpty)
-            PopupMenuButton<String>(
-              icon: const Icon(Icons.calendar_month),
-              onSelected: (month) {
-                setState(() => _selectedMonth = month);
-                _loadPhotos(month);
-              },
-              itemBuilder: (context) => _months
-                  .map((m) => PopupMenuItem(
-                        value: m,
-                        child: Text(
-                          _formatMonth(m),
-                          style: TextStyle(
-                            fontWeight:
-                                m == _selectedMonth ? FontWeight.bold : FontWeight.normal,
-                          ),
-                        ),
-                      ))
-                  .toList(),
-            ),
-        ],
-      ),
       body: Column(
         children: [
-          // Upload progress
           if (_isUploading)
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
@@ -217,80 +142,45 @@ class _HomeScreenState extends State<HomeScreen> {
                 ],
               ),
             ),
-
-          // Month header
-          if (_selectedMonth != null)
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-              child: Row(
-                children: [
-                  Text(
-                    _formatMonth(_selectedMonth!),
-                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                          fontWeight: FontWeight.bold,
-                        ),
-                  ),
-                  const Spacer(),
-                  Text(
-                    '${_photos.length}장',
-                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                          color: Colors.grey,
-                        ),
-                  ),
-                ],
-              ),
-            ),
-
-          // Photo grid
           Expanded(
-            child: _isLoading
-                ? const Center(child: CircularProgressIndicator())
-                : _photos.isEmpty
-                    ? Center(
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(Icons.photo_album_outlined,
-                                size: 80, color: Colors.grey[300]),
-                            const SizedBox(height: 16),
-                            Text(
-                              '아직 사진이 없습니다',
-                              style: TextStyle(
-                                fontSize: 16,
-                                color: Colors.grey[500],
-                              ),
-                            ),
-                            const SizedBox(height: 8),
-                            Text(
-                              '아래 + 버튼으로 사진을 추가하세요',
-                              style: TextStyle(
-                                fontSize: 14,
-                                color: Colors.grey[400],
-                              ),
-                            ),
-                          ],
-                        ),
-                      )
-                    : RefreshIndicator(
-                        onRefresh: () => _loadPhotos(_selectedMonth!),
-                        child: GridView.builder(
-                          padding: const EdgeInsets.all(2),
-                          gridDelegate:
-                              const SliverGridDelegateWithFixedCrossAxisCount(
-                            crossAxisCount: 6,
-                            crossAxisSpacing: 2,
-                            mainAxisSpacing: 2,
-                          ),
-                          itemCount: _photos.length,
-                          itemBuilder: (context, index) {
-                            final photo = _photos[index];
-                            return _PhotoGridItem(
-                              photo: photo,
-                              onTap: () => _openPhotoView(index),
-                            );
-                          },
-                        ),
-                      ),
+            child: IndexedStack(
+              index: _currentTab,
+              children: [
+                GalleryTab(
+                  key: _galleryKey,
+                  onFavoriteChanged: _onFavoriteChanged,
+                ),
+                RecentTab(
+                  key: _recentKey,
+                  onFavoriteChanged: _onFavoriteChanged,
+                ),
+                FavoritesTab(
+                  key: _favoritesKey,
+                  onFavoriteChanged: _onFavoriteChanged,
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+      bottomNavigationBar: NavigationBar(
+        selectedIndex: _currentTab,
+        onDestinationSelected: (index) => setState(() => _currentTab = index),
+        destinations: const [
+          NavigationDestination(
+            icon: Icon(Icons.photo_library_outlined),
+            selectedIcon: Icon(Icons.photo_library),
+            label: '갤러리',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.schedule_outlined),
+            selectedIcon: Icon(Icons.schedule),
+            label: '최신',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.favorite_outline),
+            selectedIcon: Icon(Icons.favorite),
+            label: '즐겨찾기',
           ),
         ],
       ),
@@ -306,51 +196,6 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
               )
             : const Icon(Icons.add_a_photo),
-      ),
-    );
-  }
-
-  void _openPhotoView(int initialIndex) {
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (context) => PhotoViewScreen(
-          photos: _photos,
-          initialIndex: initialIndex,
-          onDelete: (photo) async {
-            await ApiService.deletePhoto(photo.id);
-            await _loadMonths();
-          },
-        ),
-      ),
-    );
-  }
-}
-
-class _PhotoGridItem extends StatelessWidget {
-  final Photo photo;
-  final VoidCallback onTap;
-
-  const _PhotoGridItem({required this.photo, required this.onTap});
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Hero(
-        tag: 'photo_${photo.id}',
-        child: CachedNetworkImage(
-          imageUrl: ApiService.imageUrl(photo.thumbnailUrl),
-          fit: BoxFit.cover,
-          memCacheWidth: 75,
-          placeholder: (context, url) => Container(
-            color: Colors.grey[200],
-          ),
-          errorWidget: (context, url, error) => Container(
-            color: Colors.grey[200],
-            child: const Icon(Icons.broken_image, color: Colors.grey, size: 16),
-          ),
-        ),
       ),
     );
   }

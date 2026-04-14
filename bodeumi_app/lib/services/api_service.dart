@@ -33,6 +33,39 @@ class ApiService {
     throw Exception('Failed to load photos: ${response.statusCode}');
   }
 
+  /// Fetch recently uploaded photos
+  static Future<List<Photo>> getRecent({int limit = 20}) async {
+    final response = await http.get(
+      Uri.parse('$_base/photos/recent?limit=$limit'),
+    );
+    if (response.statusCode == 200) {
+      final data = jsonDecode(response.body) as List;
+      return data.map((json) => Photo.fromJson(json)).toList();
+    }
+    throw Exception('Failed to load recent: ${response.statusCode}');
+  }
+
+  /// Fetch favorited photos
+  static Future<List<Photo>> getFavorites() async {
+    final response = await http.get(Uri.parse('$_base/photos/favorites'));
+    if (response.statusCode == 200) {
+      final data = jsonDecode(response.body) as List;
+      return data.map((json) => Photo.fromJson(json)).toList();
+    }
+    throw Exception('Failed to load favorites: ${response.statusCode}');
+  }
+
+  /// Toggle favorite status
+  static Future<Photo> toggleFavorite(String photoId) async {
+    final response = await http.put(
+      Uri.parse('$_base/photos/$photoId/favorite'),
+    );
+    if (response.statusCode == 200) {
+      return Photo.fromJson(jsonDecode(response.body));
+    }
+    throw Exception('Toggle favorite failed: ${response.statusCode}');
+  }
+
   /// Upload a photo file
   static Future<Photo> uploadPhoto(File file) async {
     final request = http.MultipartRequest(

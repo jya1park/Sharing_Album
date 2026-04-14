@@ -11,12 +11,14 @@ class PhotoViewScreen extends StatefulWidget {
   final List<Photo> photos;
   final int initialIndex;
   final Future<void> Function(Photo photo) onDelete;
+  final Future<Photo> Function(Photo photo) onFavoriteToggle;
 
   const PhotoViewScreen({
     super.key,
     required this.photos,
     required this.initialIndex,
     required this.onDelete,
+    required this.onFavoriteToggle,
   });
 
   @override
@@ -26,11 +28,13 @@ class PhotoViewScreen extends StatefulWidget {
 class _PhotoViewScreenState extends State<PhotoViewScreen> {
   late PageController _pageController;
   late int _currentIndex;
+  late List<Photo> _photos;
 
   @override
   void initState() {
     super.initState();
     _currentIndex = widget.initialIndex;
+    _photos = List.from(widget.photos);
     _pageController = PageController(initialPage: widget.initialIndex);
   }
 
@@ -40,7 +44,7 @@ class _PhotoViewScreenState extends State<PhotoViewScreen> {
     super.dispose();
   }
 
-  Photo get _currentPhoto => widget.photos[_currentIndex];
+  Photo get _currentPhoto => _photos[_currentIndex];
 
   String _formatDate(DateTime? takenAt, DateTime uploadedAt) {
     final date = takenAt ?? uploadedAt;
@@ -51,6 +55,21 @@ class _PhotoViewScreenState extends State<PhotoViewScreen> {
     if (bytes < 1024) return '$bytes B';
     if (bytes < 1024 * 1024) return '${(bytes / 1024).toStringAsFixed(0)} KB';
     return '${(bytes / (1024 * 1024)).toStringAsFixed(1)} MB';
+  }
+
+  Future<void> _toggleFavorite() async {
+    try {
+      final updated = await widget.onFavoriteToggle(_currentPhoto);
+      setState(() {
+        _photos[_currentIndex] = updated;
+      });
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('즐겨찾기 변경 실패: $e'), backgroundColor: Colors.red),
+        );
+      }
+    }
   }
 
   void _showDeleteDialog() {
@@ -153,11 +172,18 @@ class _PhotoViewScreenState extends State<PhotoViewScreen> {
         backgroundColor: Colors.black,
         foregroundColor: Colors.white,
         title: Text(
-          '${_currentIndex + 1} / ${widget.photos.length}',
+          '${_currentIndex + 1} / ${_photos.length}',
           style: const TextStyle(fontSize: 16),
         ),
         centerTitle: true,
         actions: [
+          IconButton(
+            icon: Icon(
+              _currentPhoto.isFavorite ? Icons.favorite : Icons.favorite_border,
+              color: _currentPhoto.isFavorite ? Colors.redAccent : Colors.white,
+            ),
+            onPressed: _toggleFavorite,
+          ),
           IconButton(
             icon: const Icon(Icons.info_outline),
             onPressed: _showInfoSheet,
@@ -170,10 +196,10 @@ class _PhotoViewScreenState extends State<PhotoViewScreen> {
       ),
       body: PhotoViewGallery.builder(
         pageController: _pageController,
-        itemCount: widget.photos.length,
+        itemCount: _photos.length,
         onPageChanged: (index) => setState(() => _currentIndex = index),
         builder: (context, index) {
-          final photo = widget.photos[index];
+          final photo = _photos[index];
           return PhotoViewGalleryPageOptions(
             imageProvider: CachedNetworkImageProvider(
               ApiService.imageUrl(photo.originalUrl),
