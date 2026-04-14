@@ -34,7 +34,7 @@ class ApiService {
   }
 
   /// Fetch recently uploaded photos
-  static Future<List<Photo>> getRecent({int limit = 20}) async {
+  static Future<List<Photo>> getRecent({int limit = 50}) async {
     final response = await http.get(
       Uri.parse('$_base/photos/recent?limit=$limit'),
     );
@@ -66,13 +66,14 @@ class ApiService {
     throw Exception('Toggle favorite failed: ${response.statusCode}');
   }
 
-  /// Upload a photo file
-  static Future<Photo> uploadPhoto(File file) async {
+  /// Upload a photo file with uploader name
+  static Future<Photo> uploadPhoto(File file, {String uploaderName = ''}) async {
     final request = http.MultipartRequest(
       'POST',
       Uri.parse('$_base/photos/upload'),
     );
     request.files.add(await http.MultipartFile.fromPath('file', file.path));
+    request.fields['uploader_name'] = uploaderName;
 
     final streamedResponse = await request.send();
     final response = await http.Response.fromStream(streamedResponse);

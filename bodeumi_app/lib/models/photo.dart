@@ -8,6 +8,7 @@ class Photo {
   final DateTime uploadedAt;
   final String monthFolder;
   final bool isFavorite;
+  final String uploaderName;
 
   Photo({
     required this.id,
@@ -19,6 +20,7 @@ class Photo {
     required this.uploadedAt,
     required this.monthFolder,
     this.isFavorite = false,
+    this.uploaderName = '',
   });
 
   factory Photo.fromJson(Map<String, dynamic> json) {
@@ -32,6 +34,7 @@ class Photo {
       uploadedAt: DateTime.parse(json['uploaded_at']),
       monthFolder: json['month_folder'],
       isFavorite: json['is_favorite'] ?? false,
+      uploaderName: json['uploader_name'] ?? '',
     );
   }
 
@@ -46,6 +49,7 @@ class Photo {
       uploadedAt: uploadedAt,
       monthFolder: monthFolder,
       isFavorite: isFavorite ?? this.isFavorite,
+      uploaderName: uploaderName,
     );
   }
 }

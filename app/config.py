@@ -6,7 +6,7 @@ DATABASE_URL: str = os.getenv("DATABASE_URL", "sqlite:///./bodeumi.db")
 
 # Storage
 PHOTOS_DIR: Path = Path(os.getenv("PHOTOS_DIR", "./photos"))
-THUMBNAIL_SIZE: tuple[int, int] = (75, 75)
+THUMBNAIL_SIZE: tuple[int, int] = (300, 300)
 
 # Image processing
 MAX_IMAGE_LONG_SIDE: int = 2048

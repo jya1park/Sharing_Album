@@ -14,6 +14,7 @@ class PhotoResponse(BaseModel):
     uploaded_at: datetime
     month_folder: str
     is_favorite: bool = False
+    uploader_name: str = ""
 
 
 class PhotoListResponse(BaseModel):

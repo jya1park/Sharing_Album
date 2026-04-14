@@ -4,7 +4,7 @@ import uuid
 from datetime import datetime
 from pathlib import Path
 
-from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, File, status
+from fastapi import APIRouter, Depends, Form, HTTPException, Query, UploadFile, File, status
 from fastapi.responses import FileResponse
 from PIL import Image
 from sqlmodel import Session, select
@@ -34,12 +34,14 @@ def _build_photo_response(photo: Photo) -> PhotoResponse:
         uploaded_at=photo.uploaded_at,
         month_folder=photo.month_folder,
         is_favorite=photo.is_favorite,
+        uploader_name=photo.uploader_name,
     )
 
 
 @router.post("/upload", response_model=PhotoResponse, status_code=status.HTTP_201_CREATED)
 async def upload_photo(
     file: UploadFile = File(...),
+    uploader_name: str = Form(""),
     session: Session = Depends(get_session),
 ):
     """Upload a photo. Large images are automatically resized and compressed."""
@@ -120,6 +122,7 @@ async def upload_photo(
         taken_at=taken_at,
         uploaded_at=now,
         month_folder=month_folder,
+        uploader_name=uploader_name.strip(),
     )
     session.add(photo)
     session.commit()
