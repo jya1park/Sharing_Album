@@ -4,7 +4,7 @@ import uuid
 from datetime import datetime
 from pathlib import Path
 
-from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, File, status
+from fastapi import APIRouter, Depends, Form, HTTPException, Query, UploadFile, File, status
 from fastapi.responses import FileResponse
 from PIL import Image
 from sqlmodel import Session, select
@@ -33,12 +33,15 @@ def _build_photo_response(photo: Photo) -> PhotoResponse:
         taken_at=photo.taken_at,
         uploaded_at=photo.uploaded_at,
         month_folder=photo.month_folder,
+        is_favorite=photo.is_favorite,
+        uploader_name=photo.uploader_name,
     )
 
 
 @router.post("/upload", response_model=PhotoResponse, status_code=status.HTTP_201_CREATED)
 async def upload_photo(
     file: UploadFile = File(...),
+    uploader_name: str = Form(""),
     session: Session = Depends(get_session),
 ):
     """Upload a photo. Large images are automatically resized and compressed."""
@@ -119,6 +122,7 @@ async def upload_photo(
         taken_at=taken_at,
         uploaded_at=now,
         month_folder=month_folder,
+        uploader_name=uploader_name.strip(),
     )
     session.add(photo)
     session.commit()
@@ -133,6 +137,42 @@ async def list_months(session: Session = Depends(get_session)):
     statement = select(Photo.month_folder).distinct().order_by(Photo.month_folder.desc())
     months = session.exec(statement).all()
     return MonthListResponse(months=list(months))
+
+
+@router.get("/recent", response_model=list[PhotoResponse])
+async def list_recent(
+    limit: int = Query(20, ge=1, le=100),
+    session: Session = Depends(get_session),
+):
+    """Get most recently uploaded photos across all months."""
+    statement = select(Photo).order_by(Photo.uploaded_at.desc()).limit(limit)
+    photos = session.exec(statement).all()
+    return [_build_photo_response(p) for p in photos]
+
+
+@router.get("/favorites", response_model=list[PhotoResponse])
+async def list_favorites(session: Session = Depends(get_session)):
+    """Get all favorited photos, sorted by most recently favorited first."""
+    statement = (
+        select(Photo)
+        .where(Photo.is_favorite == True)
+        .order_by(Photo.uploaded_at.desc())
+    )
+    photos = session.exec(statement).all()
+    return [_build_photo_response(p) for p in photos]
+
+
+@router.put("/{photo_id}/favorite", response_model=PhotoResponse)
+async def toggle_favorite(photo_id: str, session: Session = Depends(get_session)):
+    """Toggle favorite status of a photo."""
+    photo = session.get(Photo, photo_id)
+    if not photo:
+        raise HTTPException(status_code=404, detail="Photo not found")
+    photo.is_favorite = not photo.is_favorite
+    session.add(photo)
+    session.commit()
+    session.refresh(photo)
+    return _build_photo_response(photo)
 
 
 @router.get("/", response_model=PhotoListResponse)

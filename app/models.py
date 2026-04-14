@@ -17,6 +17,9 @@ class Photo(SQLModel, table=True):
     uploaded_at: datetime = Field(default_factory=datetime.utcnow)
     month_folder: str = Field(index=True)  # "2026-04" for monthly queries
 
+    is_favorite: bool = Field(default=False, index=True)
+    uploader_name: str = Field(default="")
+
     # Phase 2 expansion fields (nullable for now)
     album_id: Optional[str] = Field(default=None, index=True)
     uploader_id: Optional[str] = Field(default=None, index=True)
