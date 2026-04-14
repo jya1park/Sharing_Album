@@ -22,6 +22,9 @@ class _HomeScreenState extends State<HomeScreen> {
   List<Photo> _photos = [];
   bool _isLoading = true;
   bool _isUploading = false;
+  int _uploadTotal = 0;
+  int _uploadDone = 0;
+  int _uploadSkipped = 0;
 
   @override
   void initState() {
@@ -64,34 +67,62 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
-  Future<void> _uploadPhoto(ImageSource source) async {
+  Future<void> _takePhoto() async {
     final picker = ImagePicker();
     final picked = await picker.pickImage(
-      source: source,
-      imageQuality: 100, // server handles compression
+      source: ImageSource.camera,
+      imageQuality: 100,
     );
     if (picked == null) return;
+    await _uploadFiles([picked]);
+  }
 
-    setState(() => _isUploading = true);
-    try {
-      await ApiService.uploadPhoto(File(picked.path));
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('업로드 완료!'),
-            backgroundColor: Colors.green,
-          ),
-        );
+  Future<void> _pickMultiplePhotos() async {
+    final picker = ImagePicker();
+    final picked = await picker.pickMultiImage(imageQuality: 100);
+    if (picked.isEmpty) return;
+    await _uploadFiles(picked);
+  }
+
+  Future<void> _uploadFiles(List<XFile> files) async {
+    setState(() {
+      _isUploading = true;
+      _uploadTotal = files.length;
+      _uploadDone = 0;
+      _uploadSkipped = 0;
+    });
+
+    int failed = 0;
+
+    for (final file in files) {
+      try {
+        await ApiService.uploadPhoto(File(file.path));
+      } on DuplicatePhotoException {
+        _uploadSkipped++;
+      } catch (e) {
+        failed++;
       }
-      // Reload to show new photo
-      await _loadMonths();
-    } on DuplicatePhotoException {
-      if (mounted) _showError('이미 업로드된 사진입니다');
-    } catch (e) {
-      if (mounted) _showError('업로드 실패: $e');
-    } finally {
-      setState(() => _isUploading = false);
+      setState(() => _uploadDone++);
     }
+
+    setState(() => _isUploading = false);
+
+    if (mounted) {
+      final uploaded = _uploadTotal - _uploadSkipped - failed;
+      final parts = <String>[];
+      if (uploaded > 0) parts.add('$uploaded장 업로드 완료');
+      if (_uploadSkipped > 0) parts.add('$_uploadSkipped장 중복');
+      if (failed > 0) parts.add('$failed장 실패');
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(parts.join(', ')),
+          backgroundColor: failed > 0 ? Colors.orange : Colors.green,
+        ),
+      );
+    }
+
+    await _loadMonths();
   }
 
   void _showError(String message) {
@@ -121,15 +152,15 @@ class _HomeScreenState extends State<HomeScreen> {
               title: const Text('카메라로 촬영'),
               onTap: () {
                 Navigator.pop(context);
-                _uploadPhoto(ImageSource.camera);
+                _takePhoto();
               },
             ),
             ListTile(
               leading: const Icon(Icons.photo_library),
-              title: const Text('갤러리에서 선택'),
+              title: const Text('갤러리에서 선택 (여러 장)'),
               onTap: () {
                 Navigator.pop(context);
-                _uploadPhoto(ImageSource.gallery);
+                _pickMultiplePhotos();
               },
             ),
           ],
@@ -169,8 +200,23 @@ class _HomeScreenState extends State<HomeScreen> {
       ),
       body: Column(
         children: [
-          // Upload progress indicator
-          if (_isUploading) const LinearProgressIndicator(),
+          // Upload progress
+          if (_isUploading)
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+              child: Column(
+                children: [
+                  LinearProgressIndicator(
+                    value: _uploadTotal > 0 ? _uploadDone / _uploadTotal : null,
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    '$_uploadDone / $_uploadTotal 업로드 중...',
+                    style: Theme.of(context).textTheme.bodySmall,
+                  ),
+                ],
+              ),
+            ),
 
           // Month header
           if (_selectedMonth != null)
@@ -228,12 +274,12 @@ class _HomeScreenState extends State<HomeScreen> {
                     : RefreshIndicator(
                         onRefresh: () => _loadPhotos(_selectedMonth!),
                         child: GridView.builder(
-                          padding: const EdgeInsets.all(4),
+                          padding: const EdgeInsets.all(2),
                           gridDelegate:
                               const SliverGridDelegateWithFixedCrossAxisCount(
-                            crossAxisCount: 3,
-                            crossAxisSpacing: 4,
-                            mainAxisSpacing: 4,
+                            crossAxisCount: 6,
+                            crossAxisSpacing: 2,
+                            mainAxisSpacing: 2,
                           ),
                           itemCount: _photos.length,
                           itemBuilder: (context, index) {
@@ -296,19 +342,13 @@ class _PhotoGridItem extends StatelessWidget {
         child: CachedNetworkImage(
           imageUrl: ApiService.imageUrl(photo.thumbnailUrl),
           fit: BoxFit.cover,
+          memCacheWidth: 75,
           placeholder: (context, url) => Container(
             color: Colors.grey[200],
-            child: const Center(
-              child: SizedBox(
-                width: 24,
-                height: 24,
-                child: CircularProgressIndicator(strokeWidth: 2),
-              ),
-            ),
           ),
           errorWidget: (context, url, error) => Container(
             color: Colors.grey[200],
-            child: const Icon(Icons.broken_image, color: Colors.grey),
+            child: const Icon(Icons.broken_image, color: Colors.grey, size: 16),
           ),
         ),
       ),
