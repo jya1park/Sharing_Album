@@ -2,7 +2,6 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
 import '../services/api_service.dart';
 import 'gallery_tab.dart';
@@ -21,49 +20,29 @@ class _HomeScreenState extends State<HomeScreen> {
   bool _isUploading = false;
   int _uploadTotal = 0;
   int _uploadDone = 0;
-  String _savedName = '';
 
   final _galleryKey = GlobalKey<GalleryTabState>();
   final _recentKey = GlobalKey<RecentTabState>();
   final _favoritesKey = GlobalKey<FavoritesTabState>();
 
-  @override
-  void initState() {
-    super.initState();
-    _loadSavedName();
-  }
-
-  Future<void> _loadSavedName() async {
-    final prefs = await SharedPreferences.getInstance();
-    setState(() {
-      _savedName = prefs.getString('uploader_name') ?? '';
-    });
-  }
-
-  Future<void> _saveName(String name) async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString('uploader_name', name);
-    _savedName = name;
-  }
-
-  Future<void> _takePhoto(String name) async {
+  Future<void> _takePhoto() async {
     final picker = ImagePicker();
     final picked = await picker.pickImage(
       source: ImageSource.camera,
       imageQuality: 100,
     );
     if (picked == null) return;
-    await _uploadFiles([picked], name);
+    await _uploadFiles([picked]);
   }
 
-  Future<void> _pickMultiplePhotos(String name) async {
+  Future<void> _pickMultiplePhotos() async {
     final picker = ImagePicker();
     final picked = await picker.pickMultiImage(imageQuality: 100);
     if (picked.isEmpty) return;
-    await _uploadFiles(picked, name);
+    await _uploadFiles(picked);
   }
 
-  Future<void> _uploadFiles(List<XFile> files, String uploaderName) async {
+  Future<void> _uploadFiles(List<XFile> files) async {
     setState(() {
       _isUploading = true;
       _uploadTotal = files.length;
@@ -75,7 +54,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
     for (final file in files) {
       try {
-        await ApiService.uploadPhoto(File(file.path), uploaderName: uploaderName);
+        await ApiService.uploadPhoto(File(file.path));
       } on DuplicatePhotoException {
         skipped++;
       } catch (e) {
@@ -107,53 +86,29 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   void _showUploadOptions() {
-    final nameController = TextEditingController(text: _savedName);
-
     showModalBottomSheet(
       context: context,
-      isScrollControlled: true,
-      builder: (context) => Padding(
-        padding: EdgeInsets.only(
-          bottom: MediaQuery.of(context).viewInsets.bottom,
-        ),
-        child: SafeArea(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Padding(
-                padding: const EdgeInsets.fromLTRB(20, 16, 20, 8),
-                child: TextField(
-                  controller: nameController,
-                  decoration: const InputDecoration(
-                    labelText: '이름',
-                    hintText: '공유하는 사람의 이름',
-                    border: OutlineInputBorder(),
-                    prefixIcon: Icon(Icons.person),
-                  ),
-                ),
-              ),
-              ListTile(
-                leading: const Icon(Icons.photo_camera),
-                title: const Text('카메라로 촬영'),
-                onTap: () {
-                  final name = nameController.text.trim();
-                  _saveName(name);
-                  Navigator.pop(context);
-                  _takePhoto(name);
-                },
-              ),
-              ListTile(
-                leading: const Icon(Icons.photo_library),
-                title: const Text('갤러리에서 선택 (여러 장)'),
-                onTap: () {
-                  final name = nameController.text.trim();
-                  _saveName(name);
-                  Navigator.pop(context);
-                  _pickMultiplePhotos(name);
-                },
-              ),
-            ],
-          ),
+      builder: (context) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.photo_camera),
+              title: const Text('카메라로 촬영'),
+              onTap: () {
+                Navigator.pop(context);
+                _takePhoto();
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.photo_library),
+              title: const Text('갤러리에서 선택 (여러 장)'),
+              onTap: () {
+                Navigator.pop(context);
+                _pickMultiplePhotos();
+              },
+            ),
+          ],
         ),
       ),
     );

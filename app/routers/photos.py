@@ -14,8 +14,9 @@ from app.config import (
     MAX_FILE_SIZE_BYTES,
     ALLOWED_EXTENSIONS,
 )
+from app.auth import get_current_user
 from app.database import get_session
-from app.models import Photo
+from app.models import Photo, User
 from app.schemas import PhotoResponse, PhotoListResponse, MonthListResponse, MessageResponse
 from app.utils.exif import extract_taken_date
 from app.utils.image import compress_and_resize, generate_thumbnail
@@ -41,7 +42,7 @@ def _build_photo_response(photo: Photo) -> PhotoResponse:
 @router.post("/upload", response_model=PhotoResponse, status_code=status.HTTP_201_CREATED)
 async def upload_photo(
     file: UploadFile = File(...),
-    uploader_name: str = Form(""),
+    user: User = Depends(get_current_user),
     session: Session = Depends(get_session),
 ):
     """Upload a photo. Large images are automatically resized and compressed."""
@@ -122,7 +123,8 @@ async def upload_photo(
         taken_at=taken_at,
         uploaded_at=now,
         month_folder=month_folder,
-        uploader_name=uploader_name.strip(),
+        uploader_name=user.name,
+        uploader_id=user.id,
     )
     session.add(photo)
     session.commit()

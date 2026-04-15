@@ -5,13 +5,25 @@ import 'package:http/http.dart' as http;
 
 import '../config.dart';
 import '../models/photo.dart';
+import 'auth_service.dart';
 
 class ApiService {
   static final String _base = AppConfig.baseUrl;
 
+  static Map<String, String> get _authHeaders {
+    final headers = <String, String>{};
+    if (AuthService.token != null) {
+      headers['Authorization'] = 'Bearer ${AuthService.token}';
+    }
+    return headers;
+  }
+
   /// Fetch list of months that have photos
   static Future<List<String>> getMonths() async {
-    final response = await http.get(Uri.parse('$_base/photos/months'));
+    final response = await http.get(
+      Uri.parse('$_base/photos/months'),
+      headers: _authHeaders,
+    );
     if (response.statusCode == 200) {
       final data = jsonDecode(response.body);
       return List<String>.from(data['months']);
@@ -23,6 +35,7 @@ class ApiService {
   static Future<List<Photo>> getPhotos(String month) async {
     final response = await http.get(
       Uri.parse('$_base/photos/?month=$month'),
+      headers: _authHeaders,
     );
     if (response.statusCode == 200) {
       final data = jsonDecode(response.body);
@@ -37,6 +50,7 @@ class ApiService {
   static Future<List<Photo>> getRecent({int limit = 50}) async {
     final response = await http.get(
       Uri.parse('$_base/photos/recent?limit=$limit'),
+      headers: _authHeaders,
     );
     if (response.statusCode == 200) {
       final data = jsonDecode(response.body) as List;
@@ -47,7 +61,10 @@ class ApiService {
 
   /// Fetch favorited photos
   static Future<List<Photo>> getFavorites() async {
-    final response = await http.get(Uri.parse('$_base/photos/favorites'));
+    final response = await http.get(
+      Uri.parse('$_base/photos/favorites'),
+      headers: _authHeaders,
+    );
     if (response.statusCode == 200) {
       final data = jsonDecode(response.body) as List;
       return data.map((json) => Photo.fromJson(json)).toList();
@@ -59,6 +76,7 @@ class ApiService {
   static Future<Photo> toggleFavorite(String photoId) async {
     final response = await http.put(
       Uri.parse('$_base/photos/$photoId/favorite'),
+      headers: _authHeaders,
     );
     if (response.statusCode == 200) {
       return Photo.fromJson(jsonDecode(response.body));
@@ -66,14 +84,16 @@ class ApiService {
     throw Exception('Toggle favorite failed: ${response.statusCode}');
   }
 
-  /// Upload a photo file with uploader name
-  static Future<Photo> uploadPhoto(File file, {String uploaderName = ''}) async {
+  /// Upload a photo file (auth token provides uploader name)
+  static Future<Photo> uploadPhoto(File file) async {
     final request = http.MultipartRequest(
       'POST',
       Uri.parse('$_base/photos/upload'),
     );
+    if (AuthService.token != null) {
+      request.headers['Authorization'] = 'Bearer ${AuthService.token}';
+    }
     request.files.add(await http.MultipartFile.fromPath('file', file.path));
-    request.fields['uploader_name'] = uploaderName;
 
     final streamedResponse = await request.send();
     final response = await http.Response.fromStream(streamedResponse);
@@ -91,6 +111,7 @@ class ApiService {
   static Future<void> deletePhoto(String photoId) async {
     final response = await http.delete(
       Uri.parse('$_base/photos/$photoId'),
+      headers: _authHeaders,
     );
     if (response.statusCode != 200) {
       throw Exception('Delete failed: ${response.statusCode}');

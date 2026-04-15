@@ -4,6 +4,31 @@ from typing import Optional
 from pydantic import BaseModel
 
 
+# Auth schemas
+class RegisterRequest(BaseModel):
+    name: str
+    password: str
+
+
+class LoginRequest(BaseModel):
+    name: str
+    password: str
+
+
+class TokenResponse(BaseModel):
+    access_token: str
+    token_type: str = "bearer"
+    user_id: str
+    name: str
+
+
+class UserResponse(BaseModel):
+    id: str
+    name: str
+    created_at: datetime
+
+
+# Photo schemas
 class PhotoResponse(BaseModel):
     id: str
     original_filename: str

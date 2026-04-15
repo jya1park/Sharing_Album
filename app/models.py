@@ -5,6 +5,13 @@ from typing import Optional
 from sqlmodel import SQLModel, Field
 
 
+class User(SQLModel, table=True):
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()), primary_key=True)
+    name: str = Field(index=True)
+    password_hash: str
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+
+
 class Photo(SQLModel, table=True):
     id: str = Field(default_factory=lambda: str(uuid.uuid4()), primary_key=True)
     filename: str  # stored filename (UUID-based, e.g. "a1b2c3.jpg")
@@ -20,6 +27,5 @@ class Photo(SQLModel, table=True):
     is_favorite: bool = Field(default=False, index=True)
     uploader_name: str = Field(default="")
 
-    # Phase 2 expansion fields (nullable for now)
     album_id: Optional[str] = Field(default=None, index=True)
     uploader_id: Optional[str] = Field(default=None, index=True)
