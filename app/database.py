@@ -33,6 +33,10 @@ def _migrate():
             cursor.execute("ALTER TABLE photo ADD COLUMN uploader_name TEXT DEFAULT ''")
             conn.commit()
 
+        if "media_type" not in columns:
+            cursor.execute("ALTER TABLE photo ADD COLUMN media_type TEXT DEFAULT 'photo'")
+            conn.commit()
+
     # Migrate user table
     cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='user'")
     if cursor.fetchone():

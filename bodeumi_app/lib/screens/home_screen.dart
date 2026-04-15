@@ -38,11 +38,25 @@ class _HomeScreenState extends State<HomeScreen> {
     await _uploadFiles([picked]);
   }
 
+  Future<void> _takeVideo() async {
+    final picker = ImagePicker();
+    final picked = await picker.pickVideo(source: ImageSource.camera);
+    if (picked == null) return;
+    await _uploadFiles([picked]);
+  }
+
   Future<void> _pickMultiplePhotos() async {
     final picker = ImagePicker();
     final picked = await picker.pickMultiImage(imageQuality: 100);
     if (picked.isEmpty) return;
     await _uploadFiles(picked);
+  }
+
+  Future<void> _pickVideo() async {
+    final picker = ImagePicker();
+    final picked = await picker.pickVideo(source: ImageSource.gallery);
+    if (picked == null) return;
+    await _uploadFiles([picked]);
   }
 
   Future<void> _uploadFiles(List<XFile> files) async {
@@ -97,18 +111,34 @@ class _HomeScreenState extends State<HomeScreen> {
           children: [
             ListTile(
               leading: const Icon(Icons.photo_camera),
-              title: const Text('카메라로 촬영'),
+              title: const Text('사진 촬영'),
               onTap: () {
                 Navigator.pop(context);
                 _takePhoto();
               },
             ),
             ListTile(
+              leading: const Icon(Icons.videocam),
+              title: const Text('동영상 촬영'),
+              onTap: () {
+                Navigator.pop(context);
+                _takeVideo();
+              },
+            ),
+            ListTile(
               leading: const Icon(Icons.photo_library),
-              title: const Text('갤러리에서 선택 (여러 장)'),
+              title: const Text('갤러리에서 사진 선택 (여러 장)'),
               onTap: () {
                 Navigator.pop(context);
                 _pickMultiplePhotos();
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.video_library),
+              title: const Text('갤러리에서 동영상 선택'),
+              onTap: () {
+                Navigator.pop(context);
+                _pickVideo();
               },
             ),
           ],

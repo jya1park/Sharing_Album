@@ -3,8 +3,8 @@ import 'package:intl/intl.dart';
 
 import '../models/photo.dart';
 import '../services/api_service.dart';
+import '../utils/media_helper.dart';
 import '../widgets/photo_grid.dart';
-import 'photo_view_screen.dart';
 
 const _gradientDecoration = BoxDecoration(
   gradient: LinearGradient(
@@ -137,23 +137,19 @@ class GalleryTabState extends State<GalleryTab> {
   }
 
   void _openPhotoView(List<Photo> photos, int index) {
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (context) => PhotoViewScreen(
-          photos: photos,
-          initialIndex: index,
-          onDelete: (photo) async {
-            await ApiService.deletePhoto(photo.id);
-            reload();
-          },
-          onFavoriteToggle: (photo) async {
-            final updated = await ApiService.toggleFavorite(photo.id);
-            widget.onFavoriteChanged();
-            return updated;
-          },
-        ),
-      ),
+    openMedia(
+      context: context,
+      photos: photos,
+      index: index,
+      onDelete: (photo) async {
+        await ApiService.deletePhoto(photo.id);
+        reload();
+      },
+      onFavoriteToggle: (photo) async {
+        final updated = await ApiService.toggleFavorite(photo.id);
+        widget.onFavoriteChanged();
+        return updated;
+      },
     );
   }
 

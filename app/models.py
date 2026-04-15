@@ -25,6 +25,7 @@ class Photo(SQLModel, table=True):
     uploaded_at: datetime = Field(default_factory=datetime.utcnow)
     month_folder: str = Field(index=True)
 
+    media_type: str = Field(default="photo")  # "photo" or "video"
     is_favorite: bool = Field(default=False, index=True)
     uploader_name: str = Field(default="")
 

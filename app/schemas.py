@@ -41,6 +41,7 @@ class PhotoResponse(BaseModel):
     taken_at: Optional[datetime] = None
     uploaded_at: datetime
     month_folder: str
+    media_type: str = "photo"
     is_favorite: bool = False
     uploader_name: str = ""
 
