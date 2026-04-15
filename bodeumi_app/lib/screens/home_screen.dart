@@ -271,7 +271,18 @@ class _HomeScreenState extends State<HomeScreen> {
       ),
       bottomNavigationBar: NavigationBar(
         selectedIndex: _currentTab,
-        onDestinationSelected: (index) => setState(() => _currentTab = index),
+        onDestinationSelected: (index) {
+          setState(() => _currentTab = index);
+          // Reload the selected tab
+          switch (index) {
+            case 0:
+              _recentKey.currentState?.reload();
+            case 1:
+              _galleryKey.currentState?.reload();
+            case 2:
+              _favoritesKey.currentState?.reload();
+          }
+        },
         destinations: const [
           NavigationDestination(
             icon: Icon(Icons.schedule_outlined),
