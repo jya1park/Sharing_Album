@@ -4,9 +4,12 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 
 import '../services/api_service.dart';
+import '../services/auth_service.dart';
 import 'gallery_tab.dart';
 import 'recent_tab.dart';
 import 'favorites_tab.dart';
+import 'members_screen.dart';
+import 'login_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -114,6 +117,80 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
+  void _showMenu() {
+    showModalBottomSheet(
+      context: context,
+      builder: (context) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // User info header
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 16, 20, 8),
+              child: Row(
+                children: [
+                  CircleAvatar(
+                    backgroundColor: const Color(0xFF7C4DFF),
+                    child: Text(
+                      (AuthService.nickname ?? '?').characters.first,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        AuthService.nickname ?? '',
+                        style: const TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      Text(
+                        '@${AuthService.userName ?? ''}',
+                        style: TextStyle(fontSize: 13, color: Colors.grey[600]),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+            const Divider(),
+            ListTile(
+              leading: const Icon(Icons.group),
+              title: const Text('멤버 목록'),
+              onTap: () {
+                Navigator.pop(context);
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const MembersScreen()),
+                );
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.logout, color: Colors.red),
+              title: const Text('로그아웃', style: TextStyle(color: Colors.red)),
+              onTap: () async {
+                final nav = Navigator.of(context);
+                nav.pop();
+                await AuthService.logout();
+                if (mounted) {
+                  nav.pushReplacement(
+                    MaterialPageRoute(builder: (_) => const LoginScreen()),
+                  );
+                }
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   void _onFavoriteChanged() {
     _favoritesKey.currentState?.reload();
     _galleryKey.currentState?.reload();
@@ -183,18 +260,40 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
         ],
       ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: _isUploading ? null : _showUploadOptions,
-        child: _isUploading
-            ? const SizedBox(
-                width: 24,
-                height: 24,
-                child: CircularProgressIndicator(
-                  color: Colors.white,
-                  strokeWidth: 2,
-                ),
-              )
-            : const Icon(Icons.add_a_photo),
+      floatingActionButton: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          // Menu button (small)
+          FloatingActionButton.small(
+            heroTag: 'menu',
+            onPressed: _showMenu,
+            backgroundColor: Colors.white,
+            child: Text(
+              (AuthService.nickname ?? '?').characters.first,
+              style: const TextStyle(
+                fontWeight: FontWeight.bold,
+                color: Color(0xFF7C4DFF),
+                fontSize: 16,
+              ),
+            ),
+          ),
+          const SizedBox(height: 8),
+          // Upload button
+          FloatingActionButton(
+            heroTag: 'upload',
+            onPressed: _isUploading ? null : _showUploadOptions,
+            child: _isUploading
+                ? const SizedBox(
+                    width: 24,
+                    height: 24,
+                    child: CircularProgressIndicator(
+                      color: Colors.white,
+                      strokeWidth: 2,
+                    ),
+                  )
+                : const Icon(Icons.add_a_photo),
+          ),
+        ],
       ),
     );
   }

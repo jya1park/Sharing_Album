@@ -7,6 +7,7 @@ from pydantic import BaseModel
 # Auth schemas
 class RegisterRequest(BaseModel):
     name: str
+    nickname: str
     password: str
 
 
@@ -20,11 +21,13 @@ class TokenResponse(BaseModel):
     token_type: str = "bearer"
     user_id: str
     name: str
+    nickname: str
 
 
 class UserResponse(BaseModel):
     id: str
     name: str
+    nickname: str
     created_at: datetime
 
 

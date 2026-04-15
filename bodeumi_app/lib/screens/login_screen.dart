@@ -12,14 +12,16 @@ class LoginScreen extends StatefulWidget {
 
 class _LoginScreenState extends State<LoginScreen> {
   final _nameController = TextEditingController();
+  final _nicknameController = TextEditingController();
   final _passwordController = TextEditingController();
-  bool _isLogin = true; // true = login, false = register
+  bool _isLogin = true;
   bool _isLoading = false;
   String? _error;
 
   @override
   void dispose() {
     _nameController.dispose();
+    _nicknameController.dispose();
     _passwordController.dispose();
     super.dispose();
   }
@@ -29,7 +31,11 @@ class _LoginScreenState extends State<LoginScreen> {
     final password = _passwordController.text;
 
     if (name.isEmpty) {
-      setState(() => _error = '이름을 입력해주세요');
+      setState(() => _error = '아이디를 입력해주세요');
+      return;
+    }
+    if (!_isLogin && _nicknameController.text.trim().isEmpty) {
+      setState(() => _error = '별명을 입력해주세요');
       return;
     }
     if (password.length < 4) {
@@ -46,7 +52,7 @@ class _LoginScreenState extends State<LoginScreen> {
       if (_isLogin) {
         await AuthService.login(name, password);
       } else {
-        await AuthService.register(name, password);
+        await AuthService.register(name, _nicknameController.text.trim(), password);
       }
 
       if (mounted) {
@@ -84,7 +90,6 @@ class _LoginScreenState extends State<LoginScreen> {
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  // App icon
                   Icon(
                     Icons.photo_album,
                     size: 80,
@@ -102,19 +107,16 @@ class _LoginScreenState extends State<LoginScreen> {
                   const SizedBox(height: 8),
                   Text(
                     '가족 사진 공유',
-                    style: TextStyle(
-                      fontSize: 14,
-                      color: Colors.grey[600],
-                    ),
+                    style: TextStyle(fontSize: 14, color: Colors.grey[600]),
                   ),
                   const SizedBox(height: 48),
 
-                  // Name field
+                  // ID field
                   TextField(
                     controller: _nameController,
                     decoration: InputDecoration(
-                      labelText: '이름',
-                      hintText: '사용할 이름을 입력하세요',
+                      labelText: '아이디',
+                      hintText: '로그인에 사용할 아이디',
                       prefixIcon: const Icon(Icons.person),
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(12),
@@ -125,6 +127,25 @@ class _LoginScreenState extends State<LoginScreen> {
                     textInputAction: TextInputAction.next,
                   ),
                   const SizedBox(height: 16),
+
+                  // Nickname field (only for register)
+                  if (!_isLogin) ...[
+                    TextField(
+                      controller: _nicknameController,
+                      decoration: InputDecoration(
+                        labelText: '별명',
+                        hintText: '앱에서 표시될 이름 (예: 엄마, 할머니)',
+                        prefixIcon: const Icon(Icons.badge),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        filled: true,
+                        fillColor: Colors.white.withAlpha(200),
+                      ),
+                      textInputAction: TextInputAction.next,
+                    ),
+                    const SizedBox(height: 16),
+                  ],
 
                   // Password field
                   TextField(
@@ -145,7 +166,6 @@ class _LoginScreenState extends State<LoginScreen> {
                   ),
                   const SizedBox(height: 8),
 
-                  // Error message
                   if (_error != null)
                     Padding(
                       padding: const EdgeInsets.only(bottom: 8),
@@ -157,7 +177,6 @@ class _LoginScreenState extends State<LoginScreen> {
 
                   const SizedBox(height: 16),
 
-                  // Submit button
                   SizedBox(
                     width: double.infinity,
                     height: 48,
@@ -187,7 +206,6 @@ class _LoginScreenState extends State<LoginScreen> {
                   ),
                   const SizedBox(height: 16),
 
-                  // Toggle login/register
                   TextButton(
                     onPressed: () {
                       setState(() {

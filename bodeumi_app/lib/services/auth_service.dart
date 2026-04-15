@@ -9,14 +9,17 @@ class AuthService {
   static const _tokenKey = 'auth_token';
   static const _userIdKey = 'auth_user_id';
   static const _userNameKey = 'auth_user_name';
+  static const _nicknameKey = 'auth_nickname';
 
   static String? _token;
   static String? _userId;
   static String? _userName;
+  static String? _nickname;
 
   static String? get token => _token;
   static String? get userId => _userId;
   static String? get userName => _userName;
+  static String? get nickname => _nickname;
   static bool get isLoggedIn => _token != null;
 
   /// Load saved auth state from SharedPreferences
@@ -25,6 +28,7 @@ class AuthService {
     _token = prefs.getString(_tokenKey);
     _userId = prefs.getString(_userIdKey);
     _userName = prefs.getString(_userNameKey);
+    _nickname = prefs.getString(_nicknameKey);
 
     if (_token == null) return false;
 
@@ -35,28 +39,29 @@ class AuthService {
         headers: {'Authorization': 'Bearer $_token'},
       );
       if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        _nickname = data['nickname'] ?? _nickname;
         return true;
       }
     } catch (_) {}
 
-    // Token invalid, clear saved state
     await _clearAuth();
     return false;
   }
 
   /// Register a new user
-  static Future<void> register(String name, String password) async {
+  static Future<void> register(String name, String nickname, String password) async {
     final response = await http.post(
       Uri.parse('${AppConfig.baseUrl}/auth/register'),
       headers: {'Content-Type': 'application/json'},
-      body: jsonEncode({'name': name, 'password': password}),
+      body: jsonEncode({'name': name, 'nickname': nickname, 'password': password}),
     );
 
     if (response.statusCode == 201) {
       final data = jsonDecode(response.body);
-      await _saveAuth(data['access_token'], data['user_id'], data['name']);
+      await _saveAuth(data['access_token'], data['user_id'], data['name'], data['nickname']);
     } else if (response.statusCode == 409) {
-      throw AuthException('이미 사용 중인 이름입니다');
+      throw AuthException('이미 사용 중인 아이디입니다');
     } else {
       final detail = _parseError(response.body);
       throw AuthException(detail);
@@ -73,13 +78,25 @@ class AuthService {
 
     if (response.statusCode == 200) {
       final data = jsonDecode(response.body);
-      await _saveAuth(data['access_token'], data['user_id'], data['name']);
+      await _saveAuth(data['access_token'], data['user_id'], data['name'], data['nickname']);
     } else if (response.statusCode == 401) {
-      throw AuthException('이름 또는 비밀번호가 올바르지 않습니다');
+      throw AuthException('아이디 또는 비밀번호가 올바르지 않습니다');
     } else {
       final detail = _parseError(response.body);
       throw AuthException(detail);
     }
+  }
+
+  /// Fetch all registered users
+  static Future<List<Map<String, dynamic>>> getUsers() async {
+    final response = await http.get(
+      Uri.parse('${AppConfig.baseUrl}/auth/users'),
+      headers: {'Authorization': 'Bearer $_token'},
+    );
+    if (response.statusCode == 200) {
+      return List<Map<String, dynamic>>.from(jsonDecode(response.body));
+    }
+    throw AuthException('멤버 목록을 불러올 수 없습니다');
   }
 
   /// Logout and clear saved auth
@@ -87,24 +104,28 @@ class AuthService {
     await _clearAuth();
   }
 
-  static Future<void> _saveAuth(String token, String userId, String name) async {
+  static Future<void> _saveAuth(String token, String userId, String name, String nickname) async {
     _token = token;
     _userId = userId;
     _userName = name;
+    _nickname = nickname;
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(_tokenKey, token);
     await prefs.setString(_userIdKey, userId);
     await prefs.setString(_userNameKey, name);
+    await prefs.setString(_nicknameKey, nickname);
   }
 
   static Future<void> _clearAuth() async {
     _token = null;
     _userId = null;
     _userName = null;
+    _nickname = null;
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove(_tokenKey);
     await prefs.remove(_userIdKey);
     await prefs.remove(_userNameKey);
+    await prefs.remove(_nicknameKey);
   }
 
   static String _parseError(String body) {

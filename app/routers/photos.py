@@ -123,7 +123,7 @@ async def upload_photo(
         taken_at=taken_at,
         uploaded_at=now,
         month_folder=month_folder,
-        uploader_name=user.name,
+        uploader_name=user.nickname,
         uploader_id=user.id,
     )
     session.add(photo)

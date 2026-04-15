@@ -7,22 +7,23 @@ from sqlmodel import SQLModel, Field
 
 class User(SQLModel, table=True):
     id: str = Field(default_factory=lambda: str(uuid.uuid4()), primary_key=True)
-    name: str = Field(index=True)
+    name: str = Field(index=True, sa_column_kwargs={"unique": True})
+    nickname: str = Field(default="")
     password_hash: str
     created_at: datetime = Field(default_factory=datetime.utcnow)
 
 
 class Photo(SQLModel, table=True):
     id: str = Field(default_factory=lambda: str(uuid.uuid4()), primary_key=True)
-    filename: str  # stored filename (UUID-based, e.g. "a1b2c3.jpg")
-    original_filename: str  # user's original filename
-    file_path: str  # relative path: 2026-04/original/a1b2c3.jpg
-    thumbnail_path: str  # relative path: 2026-04/thumbnails/a1b2c3_thumb.jpg
-    file_hash: str = Field(index=True)  # MD5 hash for dedup
-    file_size: int  # bytes (after compression)
-    taken_at: Optional[datetime] = None  # EXIF shooting date
+    filename: str
+    original_filename: str
+    file_path: str
+    thumbnail_path: str
+    file_hash: str = Field(index=True)
+    file_size: int
+    taken_at: Optional[datetime] = None
     uploaded_at: datetime = Field(default_factory=datetime.utcnow)
-    month_folder: str = Field(index=True)  # "2026-04" for monthly queries
+    month_folder: str = Field(index=True)
 
     is_favorite: bool = Field(default=False, index=True)
     uploader_name: str = Field(default="")
