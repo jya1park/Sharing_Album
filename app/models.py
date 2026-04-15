@@ -1,8 +1,14 @@
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone, timedelta
 from typing import Optional
 
 from sqlmodel import SQLModel, Field
+
+KST = timezone(timedelta(hours=9))
+
+
+def _now_kst() -> datetime:
+    return datetime.now(KST).replace(tzinfo=None)
 
 
 class User(SQLModel, table=True):
@@ -14,7 +20,7 @@ class User(SQLModel, table=True):
     can_upload: bool = Field(default=True)
     can_delete: bool = Field(default=True)
     can_download: bool = Field(default=True)
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=_now_kst)
 
 
 class Photo(SQLModel, table=True):
@@ -26,7 +32,7 @@ class Photo(SQLModel, table=True):
     file_hash: str = Field(index=True)
     file_size: int
     taken_at: Optional[datetime] = None
-    uploaded_at: datetime = Field(default_factory=datetime.utcnow)
+    uploaded_at: datetime = Field(default_factory=_now_kst)
     month_folder: str = Field(index=True)
 
     media_type: str = Field(default="photo")  # "photo" or "video"

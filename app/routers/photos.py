@@ -3,7 +3,7 @@ import mimetypes
 import shutil
 import tempfile
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone, timedelta
 from pathlib import Path
 
 from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, File, status
@@ -84,7 +84,7 @@ async def upload_photo(
         tmp_path = Path(tmp.name)
 
     try:
-        now = datetime.utcnow()
+        now = datetime.now(timezone(timedelta(hours=9))).replace(tzinfo=None)
         taken_at = None
 
         if is_video:
