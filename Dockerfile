@@ -22,6 +22,7 @@ RUN mkdir -p /data/photos
 # Use /data for persistent storage (mount a disk here)
 ENV DATABASE_URL="sqlite:////data/bodeumi.db"
 ENV PHOTOS_DIR="/data/photos"
+ENV TZ="Asia/Seoul"
 
 EXPOSE 8000
 
