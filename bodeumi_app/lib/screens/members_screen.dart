@@ -81,12 +81,13 @@ class _MembersScreenState extends State<MembersScreen> {
                         itemCount: _users.length,
                         itemBuilder: (context, index) {
                           final user = _users[index];
-                          final nickname = user['nickname'] ?? '';
-                          final name = user['name'] ?? '';
+                          final nickname = (user['nickname'] ?? '').toString();
+                          final name = (user['name'] ?? '').toString();
+                          final displayName = nickname.isNotEmpty ? nickname : name;
                           final isMe = user['id'] == AuthService.userId;
-                          final initial = nickname.isNotEmpty
-                              ? nickname.characters.first
-                              : (name.isNotEmpty ? name.characters.first : '?');
+                          final initial = displayName.isNotEmpty
+                              ? displayName.characters.first
+                              : '?';
 
                           return Card(
                             elevation: 0,
@@ -110,7 +111,7 @@ class _MembersScreenState extends State<MembersScreen> {
                               title: Row(
                                 children: [
                                   Text(
-                                    nickname,
+                                    displayName,
                                     style: const TextStyle(fontWeight: FontWeight.w600),
                                   ),
                                   if (isMe)
@@ -129,7 +130,7 @@ class _MembersScreenState extends State<MembersScreen> {
                                 ],
                               ),
                               subtitle: Text(
-                                '가입일: ${_formatDate(user['created_at'] ?? '')}',
+                                '@$name  |  가입일: ${_formatDate(user['created_at'] ?? '')}',
                                 style: TextStyle(fontSize: 12, color: Colors.grey[600]),
                               ),
                             ),
