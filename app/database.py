@@ -47,6 +47,16 @@ def _migrate():
             cursor.execute("ALTER TABLE user ADD COLUMN nickname TEXT DEFAULT ''")
             conn.commit()
 
+        for col, default in [
+            ("role", "'member'"),
+            ("can_upload", "1"),
+            ("can_delete", "1"),
+            ("can_download", "1"),
+        ]:
+            if col not in columns:
+                cursor.execute(f"ALTER TABLE user ADD COLUMN {col} TEXT DEFAULT {default}")
+                conn.commit()
+
     conn.close()
 
 

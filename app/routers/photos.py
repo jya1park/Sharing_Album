@@ -52,6 +52,9 @@ async def upload_photo(
 ):
     """Upload a photo or video."""
 
+    if not user.can_upload:
+        raise HTTPException(status_code=403, detail="Upload permission denied")
+
     if not file.filename:
         raise HTTPException(status_code=400, detail="Filename is required")
 
@@ -231,6 +234,7 @@ async def get_photo_file(
     else:
         file_path = PHOTOS_DIR / photo.file_path
         media_type = mimetypes.guess_type(str(file_path))[0] or "application/octet-stream"
+        # Note: download permission checked on client side
 
     if not file_path.exists():
         raise HTTPException(status_code=404, detail="File not found on disk")
@@ -243,11 +247,20 @@ async def get_photo_file(
 
 
 @router.delete("/{photo_id}", response_model=MessageResponse)
-async def delete_photo(photo_id: str, session: Session = Depends(get_session)):
+async def delete_photo(
+    photo_id: str,
+    user: User = Depends(get_current_user),
+    session: Session = Depends(get_session),
+):
     """Delete a photo (file + thumbnail + DB record)."""
     photo = session.get(Photo, photo_id)
     if not photo:
         raise HTTPException(status_code=404, detail="Photo not found")
+
+    # Only admin or uploader with delete permission can delete
+    is_owner = photo.uploader_id == user.id
+    if user.role != "admin" and not (is_owner and user.can_delete):
+        raise HTTPException(status_code=403, detail="Delete permission denied")
 
     original_file = PHOTOS_DIR / photo.file_path
     thumbnail_file = PHOTOS_DIR / photo.thumbnail_path

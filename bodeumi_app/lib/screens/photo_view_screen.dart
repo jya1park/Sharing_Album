@@ -11,6 +11,7 @@ import 'package:permission_handler/permission_handler.dart';
 
 import '../models/photo.dart';
 import '../services/api_service.dart';
+import '../services/auth_service.dart';
 
 class PhotoViewScreen extends StatefulWidget {
   final List<Photo> photos;
@@ -238,19 +239,20 @@ class _PhotoViewScreenState extends State<PhotoViewScreen> {
         ),
         centerTitle: true,
         actions: [
-          IconButton(
-            icon: _isDownloading
-                ? const SizedBox(
-                    width: 20,
-                    height: 20,
-                    child: CircularProgressIndicator(
-                      color: Colors.white,
-                      strokeWidth: 2,
-                    ),
-                  )
-                : const Icon(Icons.download),
-            onPressed: _isDownloading ? null : _downloadPhoto,
-          ),
+          if (AuthService.canDownload)
+            IconButton(
+              icon: _isDownloading
+                  ? const SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(
+                        color: Colors.white,
+                        strokeWidth: 2,
+                      ),
+                    )
+                  : const Icon(Icons.download),
+              onPressed: _isDownloading ? null : _downloadPhoto,
+            ),
           IconButton(
             icon: Icon(
               _currentPhoto.isFavorite ? Icons.favorite : Icons.favorite_border,
@@ -262,10 +264,11 @@ class _PhotoViewScreenState extends State<PhotoViewScreen> {
             icon: const Icon(Icons.info_outline),
             onPressed: _showInfoSheet,
           ),
-          IconButton(
-            icon: const Icon(Icons.delete_outline),
-            onPressed: _showDeleteDialog,
-          ),
+          if (AuthService.canDelete || AuthService.isAdmin)
+            IconButton(
+              icon: const Icon(Icons.delete_outline),
+              onPressed: _showDeleteDialog,
+            ),
         ],
       ),
       body: PhotoViewGallery.builder(

@@ -10,29 +10,44 @@ class AuthService {
   static const _userIdKey = 'auth_user_id';
   static const _userNameKey = 'auth_user_name';
   static const _nicknameKey = 'auth_nickname';
+  static const _roleKey = 'auth_role';
+  static const _canUploadKey = 'auth_can_upload';
+  static const _canDeleteKey = 'auth_can_delete';
+  static const _canDownloadKey = 'auth_can_download';
 
   static String? _token;
   static String? _userId;
   static String? _userName;
   static String? _nickname;
+  static String _role = 'member';
+  static bool _canUpload = true;
+  static bool _canDelete = true;
+  static bool _canDownload = true;
 
   static String? get token => _token;
   static String? get userId => _userId;
   static String? get userName => _userName;
   static String? get nickname => _nickname;
+  static String get role => _role;
+  static bool get isAdmin => _role == 'admin';
+  static bool get canUpload => _canUpload;
+  static bool get canDelete => _canDelete;
+  static bool get canDownload => _canDownload;
   static bool get isLoggedIn => _token != null;
 
-  /// Load saved auth state from SharedPreferences
   static Future<bool> loadSavedAuth() async {
     final prefs = await SharedPreferences.getInstance();
     _token = prefs.getString(_tokenKey);
     _userId = prefs.getString(_userIdKey);
     _userName = prefs.getString(_userNameKey);
     _nickname = prefs.getString(_nicknameKey);
+    _role = prefs.getString(_roleKey) ?? 'member';
+    _canUpload = prefs.getBool(_canUploadKey) ?? true;
+    _canDelete = prefs.getBool(_canDeleteKey) ?? true;
+    _canDownload = prefs.getBool(_canDownloadKey) ?? true;
 
     if (_token == null) return false;
 
-    // Verify token is still valid
     try {
       final response = await http.get(
         Uri.parse('${AppConfig.baseUrl}/auth/me'),
@@ -41,6 +56,11 @@ class AuthService {
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
         _nickname = data['nickname'] ?? _nickname;
+        _role = data['role'] ?? _role;
+        _canUpload = data['can_upload'] ?? _canUpload;
+        _canDelete = data['can_delete'] ?? _canDelete;
+        _canDownload = data['can_download'] ?? _canDownload;
+        await _savePrefs();
         return true;
       }
     } catch (_) {}
@@ -49,7 +69,6 @@ class AuthService {
     return false;
   }
 
-  /// Register a new user
   static Future<void> register(String name, String nickname, String password) async {
     final response = await http.post(
       Uri.parse('${AppConfig.baseUrl}/auth/register'),
@@ -58,17 +77,14 @@ class AuthService {
     );
 
     if (response.statusCode == 201) {
-      final data = jsonDecode(response.body);
-      await _saveAuth(data['access_token'], data['user_id'], data['name'], data['nickname']);
+      await _applyTokenResponse(jsonDecode(response.body));
     } else if (response.statusCode == 409) {
       throw AuthException('이미 사용 중인 아이디입니다');
     } else {
-      final detail = _parseError(response.body);
-      throw AuthException(detail);
+      throw AuthException(_parseError(response.body));
     }
   }
 
-  /// Login with existing credentials
   static Future<void> login(String name, String password) async {
     final response = await http.post(
       Uri.parse('${AppConfig.baseUrl}/auth/login'),
@@ -77,17 +93,14 @@ class AuthService {
     );
 
     if (response.statusCode == 200) {
-      final data = jsonDecode(response.body);
-      await _saveAuth(data['access_token'], data['user_id'], data['name'], data['nickname']);
+      await _applyTokenResponse(jsonDecode(response.body));
     } else if (response.statusCode == 401) {
       throw AuthException('아이디 또는 비밀번호가 올바르지 않습니다');
     } else {
-      final detail = _parseError(response.body);
-      throw AuthException(detail);
+      throw AuthException(_parseError(response.body));
     }
   }
 
-  /// Fetch all registered users
   static Future<List<Map<String, dynamic>>> getUsers() async {
     final response = await http.get(
       Uri.parse('${AppConfig.baseUrl}/auth/users'),
@@ -99,21 +112,46 @@ class AuthService {
     throw AuthException('멤버 목록을 불러올 수 없습니다');
   }
 
-  /// Logout and clear saved auth
+  static Future<void> updatePermission(String userId, Map<String, bool> perms) async {
+    final response = await http.put(
+      Uri.parse('${AppConfig.baseUrl}/auth/users/$userId/permissions'),
+      headers: {
+        'Authorization': 'Bearer $_token',
+        'Content-Type': 'application/json',
+      },
+      body: jsonEncode(perms),
+    );
+    if (response.statusCode != 200) {
+      throw AuthException(_parseError(response.body));
+    }
+  }
+
   static Future<void> logout() async {
     await _clearAuth();
   }
 
-  static Future<void> _saveAuth(String token, String userId, String name, String nickname) async {
-    _token = token;
-    _userId = userId;
-    _userName = name;
-    _nickname = nickname;
+  static Future<void> _applyTokenResponse(Map<String, dynamic> data) async {
+    _token = data['access_token'];
+    _userId = data['user_id'];
+    _userName = data['name'];
+    _nickname = data['nickname'];
+    _role = data['role'] ?? 'member';
+    _canUpload = data['can_upload'] ?? true;
+    _canDelete = data['can_delete'] ?? true;
+    _canDownload = data['can_download'] ?? true;
+    await _savePrefs();
+  }
+
+  static Future<void> _savePrefs() async {
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(_tokenKey, token);
-    await prefs.setString(_userIdKey, userId);
-    await prefs.setString(_userNameKey, name);
-    await prefs.setString(_nicknameKey, nickname);
+    if (_token != null) await prefs.setString(_tokenKey, _token!);
+    if (_userId != null) await prefs.setString(_userIdKey, _userId!);
+    if (_userName != null) await prefs.setString(_userNameKey, _userName!);
+    if (_nickname != null) await prefs.setString(_nicknameKey, _nickname!);
+    await prefs.setString(_roleKey, _role);
+    await prefs.setBool(_canUploadKey, _canUpload);
+    await prefs.setBool(_canDeleteKey, _canDelete);
+    await prefs.setBool(_canDownloadKey, _canDownload);
   }
 
   static Future<void> _clearAuth() async {
@@ -121,17 +159,22 @@ class AuthService {
     _userId = null;
     _userName = null;
     _nickname = null;
+    _role = 'member';
+    _canUpload = true;
+    _canDelete = true;
+    _canDownload = true;
     final prefs = await SharedPreferences.getInstance();
-    await prefs.remove(_tokenKey);
-    await prefs.remove(_userIdKey);
-    await prefs.remove(_userNameKey);
-    await prefs.remove(_nicknameKey);
+    for (final key in [_tokenKey, _userIdKey, _userNameKey, _nicknameKey, _roleKey]) {
+      await prefs.remove(key);
+    }
+    for (final key in [_canUploadKey, _canDeleteKey, _canDownloadKey]) {
+      await prefs.remove(key);
+    }
   }
 
   static String _parseError(String body) {
     try {
-      final data = jsonDecode(body);
-      return data['detail'] ?? '알 수 없는 오류';
+      return (jsonDecode(body)['detail'] ?? '알 수 없는 오류').toString();
     } catch (_) {
       return '서버 오류';
     }

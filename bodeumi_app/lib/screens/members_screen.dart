@@ -47,6 +47,74 @@ class _MembersScreenState extends State<MembersScreen> {
     }
   }
 
+  Future<void> _togglePermission(String userId, String field, bool value) async {
+    try {
+      await AuthService.updatePermission(userId, {field: value});
+      await _load();
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('권한 변경 실패: $e'), backgroundColor: Colors.red),
+        );
+      }
+    }
+  }
+
+  void _showPermissionDialog(Map<String, dynamic> user) {
+    final nickname = (user['nickname'] ?? user['name'] ?? '').toString();
+    bool canUpload = user['can_upload'] ?? true;
+    bool canDelete = user['can_delete'] ?? true;
+    bool canDownload = user['can_download'] ?? true;
+    final userId = user['id'] as String;
+
+    showDialog(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          title: Text('$nickname 권한 관리'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              SwitchListTile(
+                title: const Text('업로드'),
+                subtitle: const Text('사진/동영상 업로드 허용'),
+                value: canUpload,
+                onChanged: (v) {
+                  setDialogState(() => canUpload = v);
+                  _togglePermission(userId, 'can_upload', v);
+                },
+              ),
+              SwitchListTile(
+                title: const Text('삭제'),
+                subtitle: const Text('사진/동영상 삭제 허용'),
+                value: canDelete,
+                onChanged: (v) {
+                  setDialogState(() => canDelete = v);
+                  _togglePermission(userId, 'can_delete', v);
+                },
+              ),
+              SwitchListTile(
+                title: const Text('다운로드'),
+                subtitle: const Text('원본 다운로드 허용'),
+                value: canDownload,
+                onChanged: (v) {
+                  setDialogState(() => canDownload = v);
+                  _togglePermission(userId, 'can_download', v);
+                },
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('닫기'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -85,6 +153,7 @@ class _MembersScreenState extends State<MembersScreen> {
                           final name = (user['name'] ?? '').toString();
                           final displayName = nickname.isNotEmpty ? nickname : name;
                           final isMe = user['id'] == AuthService.userId;
+                          final isAdmin = user['role'] == 'admin';
                           final initial = displayName.isNotEmpty
                               ? displayName.characters.first
                               : '?';
@@ -97,14 +166,16 @@ class _MembersScreenState extends State<MembersScreen> {
                             ),
                             child: ListTile(
                               leading: CircleAvatar(
-                                backgroundColor: isMe
-                                    ? const Color(0xFF7C4DFF)
-                                    : const Color(0xFFE1BEE7),
+                                backgroundColor: isAdmin
+                                    ? const Color(0xFFFF9800)
+                                    : isMe
+                                        ? const Color(0xFF7C4DFF)
+                                        : const Color(0xFFE1BEE7),
                                 child: Text(
                                   initial,
                                   style: TextStyle(
                                     fontWeight: FontWeight.bold,
-                                    color: isMe ? Colors.white : const Color(0xFF6A1B9A),
+                                    color: (isAdmin || isMe) ? Colors.white : const Color(0xFF6A1B9A),
                                   ),
                                 ),
                               ),
@@ -114,7 +185,20 @@ class _MembersScreenState extends State<MembersScreen> {
                                     displayName,
                                     style: const TextStyle(fontWeight: FontWeight.w600),
                                   ),
-                                  if (isMe)
+                                  if (isAdmin)
+                                    Container(
+                                      margin: const EdgeInsets.only(left: 8),
+                                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                      decoration: BoxDecoration(
+                                        color: const Color(0xFFFF9800),
+                                        borderRadius: BorderRadius.circular(8),
+                                      ),
+                                      child: const Text(
+                                        '관리자',
+                                        style: TextStyle(color: Colors.white, fontSize: 11),
+                                      ),
+                                    ),
+                                  if (isMe && !isAdmin)
                                     Container(
                                       margin: const EdgeInsets.only(left: 8),
                                       padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
@@ -133,6 +217,12 @@ class _MembersScreenState extends State<MembersScreen> {
                                 '@$name  |  가입일: ${_formatDate(user['created_at'] ?? '')}',
                                 style: TextStyle(fontSize: 12, color: Colors.grey[600]),
                               ),
+                              trailing: (AuthService.isAdmin && !isAdmin)
+                                  ? IconButton(
+                                      icon: const Icon(Icons.settings, size: 20),
+                                      onPressed: () => _showPermissionDialog(user),
+                                    )
+                                  : null,
                             ),
                           );
                         },

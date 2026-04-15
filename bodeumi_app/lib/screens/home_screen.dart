@@ -307,22 +307,24 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
             ),
           ),
-          const SizedBox(height: 8),
-          // Upload button
-          FloatingActionButton(
-            heroTag: 'upload',
-            onPressed: _isUploading ? null : _showUploadOptions,
-            child: _isUploading
-                ? const SizedBox(
-                    width: 24,
-                    height: 24,
-                    child: CircularProgressIndicator(
-                      color: Colors.white,
-                      strokeWidth: 2,
-                    ),
-                  )
-                : const Icon(Icons.add_a_photo),
-          ),
+          if (AuthService.canUpload) ...[
+            const SizedBox(height: 8),
+            // Upload button
+            FloatingActionButton(
+              heroTag: 'upload',
+              onPressed: _isUploading ? null : _showUploadOptions,
+              child: _isUploading
+                  ? const SizedBox(
+                      width: 24,
+                      height: 24,
+                      child: CircularProgressIndicator(
+                        color: Colors.white,
+                        strokeWidth: 2,
+                      ),
+                    )
+                  : const Icon(Icons.add_a_photo),
+            ),
+          ],
         ],
       ),
     );

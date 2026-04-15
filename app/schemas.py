@@ -22,13 +22,27 @@ class TokenResponse(BaseModel):
     user_id: str
     name: str
     nickname: str
+    role: str = "member"
+    can_upload: bool = True
+    can_delete: bool = True
+    can_download: bool = True
 
 
 class UserResponse(BaseModel):
     id: str
     name: str
     nickname: str
+    role: str = "member"
+    can_upload: bool = True
+    can_delete: bool = True
+    can_download: bool = True
     created_at: datetime
+
+
+class UpdatePermissionRequest(BaseModel):
+    can_upload: Optional[bool] = None
+    can_delete: Optional[bool] = None
+    can_download: Optional[bool] = None
 
 
 # Photo schemas

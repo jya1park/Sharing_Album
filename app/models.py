@@ -10,6 +10,10 @@ class User(SQLModel, table=True):
     name: str = Field(index=True, sa_column_kwargs={"unique": True})
     nickname: str = Field(default="")
     password_hash: str
+    role: str = Field(default="member")  # "admin" or "member"
+    can_upload: bool = Field(default=True)
+    can_delete: bool = Field(default=True)
+    can_download: bool = Field(default=True)
     created_at: datetime = Field(default_factory=datetime.utcnow)
 
 
