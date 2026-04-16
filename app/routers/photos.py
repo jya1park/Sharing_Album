@@ -1,10 +1,12 @@
 import hashlib
+import mimetypes
+import shutil
 import tempfile
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone, timedelta
 from pathlib import Path
 
-from fastapi import APIRouter, Depends, Form, HTTPException, Query, UploadFile, File, status
+from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, File, status
 from fastapi.responses import FileResponse
 from PIL import Image
 from sqlmodel import Session, select
@@ -13,12 +15,15 @@ from app.config import (
     PHOTOS_DIR,
     MAX_FILE_SIZE_BYTES,
     ALLOWED_EXTENSIONS,
+    ALLOWED_VIDEO_EXTENSIONS,
 )
+from app.auth import get_current_user
 from app.database import get_session
-from app.models import Photo
+from app.models import Photo, User
 from app.schemas import PhotoResponse, PhotoListResponse, MonthListResponse, MessageResponse
 from app.utils.exif import extract_taken_date
 from app.utils.image import compress_and_resize, generate_thumbnail
+from app.utils.video import generate_video_thumbnail
 
 router = APIRouter()
 
@@ -33,6 +38,7 @@ def _build_photo_response(photo: Photo) -> PhotoResponse:
         taken_at=photo.taken_at,
         uploaded_at=photo.uploaded_at,
         month_folder=photo.month_folder,
+        media_type=photo.media_type,
         is_favorite=photo.is_favorite,
         uploader_name=photo.uploader_name,
     )
@@ -41,12 +47,14 @@ def _build_photo_response(photo: Photo) -> PhotoResponse:
 @router.post("/upload", response_model=PhotoResponse, status_code=status.HTTP_201_CREATED)
 async def upload_photo(
     file: UploadFile = File(...),
-    uploader_name: str = Form(""),
+    user: User = Depends(get_current_user),
     session: Session = Depends(get_session),
 ):
-    """Upload a photo. Large images are automatically resized and compressed."""
+    """Upload a photo or video."""
 
-    # 1. Validate file extension
+    if not user.can_upload:
+        raise HTTPException(status_code=403, detail="Upload permission denied")
+
     if not file.filename:
         raise HTTPException(status_code=400, detail="Filename is required")
 
@@ -57,7 +65,8 @@ async def upload_photo(
             detail=f"File type '{ext}' not allowed. Allowed: {', '.join(ALLOWED_EXTENSIONS)}",
         )
 
-    # 2. Read file content and check size
+    is_video = ext in ALLOWED_VIDEO_EXTENSIONS
+
     content = await file.read()
     if len(content) > MAX_FILE_SIZE_BYTES:
         raise HTTPException(
@@ -65,34 +74,32 @@ async def upload_photo(
             detail=f"File too large. Maximum size: {MAX_FILE_SIZE_BYTES // (1024 * 1024)}MB",
         )
 
-    # 3. Compute MD5 hash for dedup
     file_hash = hashlib.md5(content).hexdigest()
-
-    existing = session.exec(
-        select(Photo).where(Photo.file_hash == file_hash)
-    ).first()
+    existing = session.exec(select(Photo).where(Photo.file_hash == file_hash)).first()
     if existing:
-        raise HTTPException(
-            status_code=409,
-            detail="This photo has already been uploaded",
-        )
+        raise HTTPException(status_code=409, detail="This file has already been uploaded")
 
-    # 4. Save to temp file for Pillow processing
     with tempfile.NamedTemporaryFile(delete=False, suffix=f".{ext}") as tmp:
         tmp.write(content)
         tmp_path = Path(tmp.name)
 
     try:
-        # 5. Extract EXIF date
-        with Image.open(tmp_path) as img:
-            taken_at = extract_taken_date(img)
+        now = datetime.now(timezone(timedelta(hours=9))).replace(tzinfo=None)
+        taken_at = None
 
-        now = datetime.utcnow()
-        reference_date = taken_at if taken_at else now
-        month_folder = reference_date.strftime("%Y-%m")
+        if is_video:
+            # Video: keep original extension, no resize
+            stored_ext = ext
+            month_folder = now.strftime("%Y-%m")
+        else:
+            # Photo: extract EXIF, will be saved as jpg
+            stored_ext = "jpg"
+            with Image.open(tmp_path) as img:
+                taken_at = extract_taken_date(img)
+            reference_date = taken_at if taken_at else now
+            month_folder = reference_date.strftime("%Y-%m")
 
-        # 6. Generate UUID filename
-        stored_name = f"{uuid.uuid4()}.jpg"
+        stored_name = f"{uuid.uuid4()}.{stored_ext}"
         thumb_name = f"{stored_name.rsplit('.', 1)[0]}_thumb.jpg"
 
         original_dir = PHOTOS_DIR / month_folder / "original"
@@ -101,17 +108,21 @@ async def upload_photo(
         original_path = original_dir / stored_name
         thumbnail_path = thumbnail_dir / thumb_name
 
-        # 7. Resize/compress and save original
-        file_size = compress_and_resize(tmp_path, original_path)
-
-        # 8. Generate thumbnail
-        generate_thumbnail(original_path, thumbnail_path)
+        if is_video:
+            # Save video as-is
+            original_dir.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(str(tmp_path), str(original_path))
+            file_size = len(content)
+            # Generate thumbnail from first frame
+            generate_video_thumbnail(tmp_path, thumbnail_path)
+        else:
+            # Resize/compress photo
+            file_size = compress_and_resize(tmp_path, original_path)
+            generate_thumbnail(original_path, thumbnail_path)
 
     finally:
-        # Clean up temp file
         tmp_path.unlink(missing_ok=True)
 
-    # 9. Create DB record
     photo = Photo(
         filename=stored_name,
         original_filename=file.filename,
@@ -122,7 +133,9 @@ async def upload_photo(
         taken_at=taken_at,
         uploaded_at=now,
         month_folder=month_folder,
-        uploader_name=uploader_name.strip(),
+        media_type="video" if is_video else "photo",
+        uploader_name=user.nickname,
+        uploader_id=user.id,
     )
     session.add(photo)
     session.commit()
@@ -210,34 +223,45 @@ async def get_photo_file(
     type: str = Query("original", pattern=r"^(original|thumbnail)$"),
     session: Session = Depends(get_session),
 ):
-    """Serve the actual image file (original or thumbnail)."""
+    """Serve the actual image/video file (original or thumbnail)."""
     photo = session.get(Photo, photo_id)
     if not photo:
         raise HTTPException(status_code=404, detail="Photo not found")
 
     if type == "thumbnail":
         file_path = PHOTOS_DIR / photo.thumbnail_path
+        media_type = "image/jpeg"
     else:
         file_path = PHOTOS_DIR / photo.file_path
+        media_type = mimetypes.guess_type(str(file_path))[0] or "application/octet-stream"
+        # Note: download permission checked on client side
 
     if not file_path.exists():
         raise HTTPException(status_code=404, detail="File not found on disk")
 
     return FileResponse(
         path=str(file_path),
-        media_type="image/jpeg",
+        media_type=media_type,
         filename=photo.original_filename if type == "original" else None,
     )
 
 
 @router.delete("/{photo_id}", response_model=MessageResponse)
-async def delete_photo(photo_id: str, session: Session = Depends(get_session)):
+async def delete_photo(
+    photo_id: str,
+    user: User = Depends(get_current_user),
+    session: Session = Depends(get_session),
+):
     """Delete a photo (file + thumbnail + DB record)."""
     photo = session.get(Photo, photo_id)
     if not photo:
         raise HTTPException(status_code=404, detail="Photo not found")
 
-    # Delete files from disk
+    # Only admin or uploader with delete permission can delete
+    is_owner = photo.uploader_id == user.id
+    if user.role != "admin" and not (is_owner and user.can_delete):
+        raise HTTPException(status_code=403, detail="Delete permission denied")
+
     original_file = PHOTOS_DIR / photo.file_path
     thumbnail_file = PHOTOS_DIR / photo.thumbnail_path
 
@@ -246,8 +270,7 @@ async def delete_photo(photo_id: str, session: Session = Depends(get_session)):
     if thumbnail_file.exists():
         thumbnail_file.unlink()
 
-    # Delete DB record
     session.delete(photo)
     session.commit()
 
-    return MessageResponse(message=f"Photo '{photo.original_filename}' deleted successfully")
+    return MessageResponse(message=f"'{photo.original_filename}' deleted successfully")

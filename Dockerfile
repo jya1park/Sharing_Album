@@ -8,6 +8,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libffi-dev \
     libjpeg62-turbo-dev \
     libwebp-dev \
+    ffmpeg \
     && rm -rf /var/lib/apt/lists/*
 
 COPY requirements.txt .
@@ -21,6 +22,7 @@ RUN mkdir -p /data/photos
 # Use /data for persistent storage (mount a disk here)
 ENV DATABASE_URL="sqlite:////data/bodeumi.db"
 ENV PHOTOS_DIR="/data/photos"
+ENV TZ="Asia/Seoul"
 
 EXPOSE 8000
 

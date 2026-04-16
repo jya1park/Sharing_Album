@@ -7,6 +7,7 @@ class Photo {
   final DateTime? takenAt;
   final DateTime uploadedAt;
   final String monthFolder;
+  final String mediaType;
   final bool isFavorite;
   final String uploaderName;
 
@@ -19,9 +20,12 @@ class Photo {
     this.takenAt,
     required this.uploadedAt,
     required this.monthFolder,
+    this.mediaType = 'photo',
     this.isFavorite = false,
     this.uploaderName = '',
   });
+
+  bool get isVideo => mediaType == 'video';
 
   factory Photo.fromJson(Map<String, dynamic> json) {
     return Photo(
@@ -33,6 +37,7 @@ class Photo {
       takenAt: json['taken_at'] != null ? DateTime.parse(json['taken_at']) : null,
       uploadedAt: DateTime.parse(json['uploaded_at']),
       monthFolder: json['month_folder'],
+      mediaType: json['media_type'] ?? 'photo',
       isFavorite: json['is_favorite'] ?? false,
       uploaderName: json['uploader_name'] ?? '',
     );
@@ -48,6 +53,7 @@ class Photo {
       takenAt: takenAt,
       uploadedAt: uploadedAt,
       monthFolder: monthFolder,
+      mediaType: mediaType,
       isFavorite: isFavorite ?? this.isFavorite,
       uploaderName: uploaderName,
     );

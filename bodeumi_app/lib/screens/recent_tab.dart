@@ -4,7 +4,7 @@ import 'package:intl/intl.dart';
 
 import '../models/photo.dart';
 import '../services/api_service.dart';
-import 'photo_view_screen.dart';
+import '../utils/media_helper.dart';
 
 const _gradientDecoration = BoxDecoration(
   gradient: LinearGradient(
@@ -109,23 +109,19 @@ class RecentTabState extends State<RecentTab> {
     final index = _flatIndexOf(photo);
     if (index < 0) return;
 
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (context) => PhotoViewScreen(
-          photos: _allPhotos,
-          initialIndex: index,
-          onDelete: (p) async {
-            await ApiService.deletePhoto(p.id);
-            reload();
-          },
-          onFavoriteToggle: (p) async {
-            final updated = await ApiService.toggleFavorite(p.id);
-            widget.onFavoriteChanged();
-            return updated;
-          },
-        ),
-      ),
+    openMedia(
+      context: context,
+      photos: _allPhotos,
+      index: index,
+      onDelete: (p) async {
+        await ApiService.deletePhoto(p.id);
+        reload();
+      },
+      onFavoriteToggle: (p) async {
+        final updated = await ApiService.toggleFavorite(p.id);
+        widget.onFavoriteChanged();
+        return updated;
+      },
     );
   }
 
@@ -281,20 +277,37 @@ class _UploadGroupCard extends StatelessWidget {
                         child: SizedBox(
                           width: itemWidth,
                           height: itemWidth,
-                          child: Hero(
-                            tag: 'photo_${photo.id}',
-                            child: CachedNetworkImage(
-                              imageUrl:
-                                  ApiService.imageUrl(photo.thumbnailUrl),
-                              fit: BoxFit.cover,
-                              placeholder: (context, url) =>
-                                  Container(color: Colors.grey[200]),
-                              errorWidget: (context, url, error) => Container(
-                                color: Colors.grey[200],
-                                child: const Icon(Icons.broken_image,
-                                    color: Colors.grey, size: 24),
+                          child: Stack(
+                            fit: StackFit.expand,
+                            children: [
+                              Hero(
+                                tag: 'photo_${photo.id}',
+                                child: CachedNetworkImage(
+                                  imageUrl:
+                                      ApiService.imageUrl(photo.thumbnailUrl),
+                                  fit: BoxFit.cover,
+                                  placeholder: (context, url) =>
+                                      Container(color: Colors.grey[200]),
+                                  errorWidget: (context, url, error) => Container(
+                                    color: Colors.grey[200],
+                                    child: const Icon(Icons.broken_image,
+                                        color: Colors.grey, size: 24),
+                                  ),
+                                ),
                               ),
-                            ),
+                              if (photo.isVideo)
+                                Center(
+                                  child: Container(
+                                    padding: const EdgeInsets.all(4),
+                                    decoration: BoxDecoration(
+                                      color: Colors.black.withAlpha(100),
+                                      shape: BoxShape.circle,
+                                    ),
+                                    child: const Icon(Icons.play_arrow,
+                                        color: Colors.white, size: 20),
+                                  ),
+                                ),
+                            ],
                           ),
                         ),
                       ),

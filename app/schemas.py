@@ -4,6 +4,48 @@ from typing import Optional
 from pydantic import BaseModel
 
 
+# Auth schemas
+class RegisterRequest(BaseModel):
+    name: str
+    nickname: str
+    password: str
+
+
+class LoginRequest(BaseModel):
+    name: str
+    password: str
+
+
+class TokenResponse(BaseModel):
+    access_token: str
+    token_type: str = "bearer"
+    user_id: str
+    name: str
+    nickname: str
+    role: str = "member"
+    can_upload: bool = True
+    can_delete: bool = True
+    can_download: bool = True
+
+
+class UserResponse(BaseModel):
+    id: str
+    name: str
+    nickname: str
+    role: str = "member"
+    can_upload: bool = True
+    can_delete: bool = True
+    can_download: bool = True
+    created_at: datetime
+
+
+class UpdatePermissionRequest(BaseModel):
+    can_upload: Optional[bool] = None
+    can_delete: Optional[bool] = None
+    can_download: Optional[bool] = None
+
+
+# Photo schemas
 class PhotoResponse(BaseModel):
     id: str
     original_filename: str
@@ -13,6 +55,7 @@ class PhotoResponse(BaseModel):
     taken_at: Optional[datetime] = None
     uploaded_at: datetime
     month_folder: str
+    media_type: str = "photo"
     is_favorite: bool = False
     uploader_name: str = ""
 

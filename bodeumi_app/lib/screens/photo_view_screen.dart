@@ -1,11 +1,17 @@
+import 'dart:typed_data';
+
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:photo_view/photo_view.dart';
 import 'package:photo_view/photo_view_gallery.dart';
 import 'package:intl/intl.dart';
+import 'package:dio/dio.dart';
+import 'package:image_gallery_saver_plus/image_gallery_saver_plus.dart';
+import 'package:permission_handler/permission_handler.dart';
 
 import '../models/photo.dart';
 import '../services/api_service.dart';
+import '../services/auth_service.dart';
 
 class PhotoViewScreen extends StatefulWidget {
   final List<Photo> photos;
@@ -29,6 +35,7 @@ class _PhotoViewScreenState extends State<PhotoViewScreen> {
   late PageController _pageController;
   late int _currentIndex;
   late List<Photo> _photos;
+  bool _isDownloading = false;
 
   @override
   void initState() {
@@ -69,6 +76,61 @@ class _PhotoViewScreenState extends State<PhotoViewScreen> {
           SnackBar(content: Text('즐겨찾기 변경 실패: $e'), backgroundColor: Colors.red),
         );
       }
+    }
+  }
+
+  Future<void> _downloadPhoto() async {
+    if (_isDownloading) return;
+
+    setState(() => _isDownloading = true);
+
+    try {
+      // Request storage permission
+      final status = await Permission.photos.request();
+      if (!status.isGranted) {
+        final storageStatus = await Permission.storage.request();
+        if (!storageStatus.isGranted) {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('저장소 권한이 필요합니다'), backgroundColor: Colors.orange),
+            );
+          }
+          setState(() => _isDownloading = false);
+          return;
+        }
+      }
+
+      // Download the original image
+      final url = ApiService.imageUrl(_currentPhoto.originalUrl);
+      final response = await Dio().get(
+        url,
+        options: Options(responseType: ResponseType.bytes),
+      );
+
+      // Save to gallery
+      final result = await ImageGallerySaverPlus.saveImage(
+        Uint8List.fromList(response.data),
+        quality: 100,
+        name: _currentPhoto.originalFilename.replaceAll(RegExp(r'\.[^.]+$'), ''),
+      );
+
+      if (mounted) {
+        final success = result['isSuccess'] == true;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(success ? '갤러리에 저장 완료' : '저장 실패'),
+            backgroundColor: success ? Colors.green : Colors.red,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('다운로드 실패: $e'), backgroundColor: Colors.red),
+        );
+      }
+    } finally {
+      setState(() => _isDownloading = false);
     }
   }
 
@@ -177,6 +239,20 @@ class _PhotoViewScreenState extends State<PhotoViewScreen> {
         ),
         centerTitle: true,
         actions: [
+          if (AuthService.canDownload)
+            IconButton(
+              icon: _isDownloading
+                  ? const SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(
+                        color: Colors.white,
+                        strokeWidth: 2,
+                      ),
+                    )
+                  : const Icon(Icons.download),
+              onPressed: _isDownloading ? null : _downloadPhoto,
+            ),
           IconButton(
             icon: Icon(
               _currentPhoto.isFavorite ? Icons.favorite : Icons.favorite_border,
@@ -188,10 +264,11 @@ class _PhotoViewScreenState extends State<PhotoViewScreen> {
             icon: const Icon(Icons.info_outline),
             onPressed: _showInfoSheet,
           ),
-          IconButton(
-            icon: const Icon(Icons.delete_outline),
-            onPressed: _showDeleteDialog,
-          ),
+          if (AuthService.canDelete || AuthService.isAdmin)
+            IconButton(
+              icon: const Icon(Icons.delete_outline),
+              onPressed: _showDeleteDialog,
+            ),
         ],
       ),
       body: PhotoViewGallery.builder(

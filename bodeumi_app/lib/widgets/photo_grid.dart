@@ -51,6 +51,22 @@ class PhotoGrid extends StatelessWidget {
                           color: Colors.grey, size: 24),
                     ),
                   ),
+                  // Video play icon overlay
+                  if (photo.isVideo)
+                    Center(
+                      child: Container(
+                        padding: const EdgeInsets.all(6),
+                        decoration: BoxDecoration(
+                          color: Colors.black.withAlpha(100),
+                          shape: BoxShape.circle,
+                        ),
+                        child: const Icon(
+                          Icons.play_arrow,
+                          color: Colors.white,
+                          size: 24,
+                        ),
+                      ),
+                    ),
                   if (showFavoriteIcon || photo.isFavorite)
                     const Positioned(
                       right: 4,

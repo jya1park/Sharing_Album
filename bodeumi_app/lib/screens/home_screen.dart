@@ -2,12 +2,14 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
 import '../services/api_service.dart';
+import '../services/auth_service.dart';
 import 'gallery_tab.dart';
 import 'recent_tab.dart';
 import 'favorites_tab.dart';
+import 'members_screen.dart';
+import 'login_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -21,49 +23,43 @@ class _HomeScreenState extends State<HomeScreen> {
   bool _isUploading = false;
   int _uploadTotal = 0;
   int _uploadDone = 0;
-  String _savedName = '';
 
   final _galleryKey = GlobalKey<GalleryTabState>();
   final _recentKey = GlobalKey<RecentTabState>();
   final _favoritesKey = GlobalKey<FavoritesTabState>();
 
-  @override
-  void initState() {
-    super.initState();
-    _loadSavedName();
-  }
-
-  Future<void> _loadSavedName() async {
-    final prefs = await SharedPreferences.getInstance();
-    setState(() {
-      _savedName = prefs.getString('uploader_name') ?? '';
-    });
-  }
-
-  Future<void> _saveName(String name) async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString('uploader_name', name);
-    _savedName = name;
-  }
-
-  Future<void> _takePhoto(String name) async {
+  Future<void> _takePhoto() async {
     final picker = ImagePicker();
     final picked = await picker.pickImage(
       source: ImageSource.camera,
       imageQuality: 100,
     );
     if (picked == null) return;
-    await _uploadFiles([picked], name);
+    await _uploadFiles([picked]);
   }
 
-  Future<void> _pickMultiplePhotos(String name) async {
+  Future<void> _takeVideo() async {
+    final picker = ImagePicker();
+    final picked = await picker.pickVideo(source: ImageSource.camera);
+    if (picked == null) return;
+    await _uploadFiles([picked]);
+  }
+
+  Future<void> _pickMultiplePhotos() async {
     final picker = ImagePicker();
     final picked = await picker.pickMultiImage(imageQuality: 100);
     if (picked.isEmpty) return;
-    await _uploadFiles(picked, name);
+    await _uploadFiles(picked);
   }
 
-  Future<void> _uploadFiles(List<XFile> files, String uploaderName) async {
+  Future<void> _pickVideo() async {
+    final picker = ImagePicker();
+    final picked = await picker.pickVideo(source: ImageSource.gallery);
+    if (picked == null) return;
+    await _uploadFiles([picked]);
+  }
+
+  Future<void> _uploadFiles(List<XFile> files) async {
     setState(() {
       _isUploading = true;
       _uploadTotal = files.length;
@@ -75,7 +71,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
     for (final file in files) {
       try {
-        await ApiService.uploadPhoto(File(file.path), uploaderName: uploaderName);
+        await ApiService.uploadPhoto(File(file.path));
       } on DuplicatePhotoException {
         skipped++;
       } catch (e) {
@@ -107,53 +103,119 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   void _showUploadOptions() {
-    final nameController = TextEditingController(text: _savedName);
-
     showModalBottomSheet(
       context: context,
-      isScrollControlled: true,
-      builder: (context) => Padding(
-        padding: EdgeInsets.only(
-          bottom: MediaQuery.of(context).viewInsets.bottom,
+      builder: (context) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.photo_camera),
+              title: const Text('사진 촬영'),
+              onTap: () {
+                Navigator.pop(context);
+                _takePhoto();
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.videocam),
+              title: const Text('동영상 촬영'),
+              onTap: () {
+                Navigator.pop(context);
+                _takeVideo();
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.photo_library),
+              title: const Text('갤러리에서 사진 선택 (여러 장)'),
+              onTap: () {
+                Navigator.pop(context);
+                _pickMultiplePhotos();
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.video_library),
+              title: const Text('갤러리에서 동영상 선택'),
+              onTap: () {
+                Navigator.pop(context);
+                _pickVideo();
+              },
+            ),
+          ],
         ),
-        child: SafeArea(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Padding(
-                padding: const EdgeInsets.fromLTRB(20, 16, 20, 8),
-                child: TextField(
-                  controller: nameController,
-                  decoration: const InputDecoration(
-                    labelText: '이름',
-                    hintText: '공유하는 사람의 이름',
-                    border: OutlineInputBorder(),
-                    prefixIcon: Icon(Icons.person),
+      ),
+    );
+  }
+
+  void _showMenu() {
+    showModalBottomSheet(
+      context: context,
+      builder: (context) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // User info header
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 16, 20, 8),
+              child: Row(
+                children: [
+                  CircleAvatar(
+                    backgroundColor: const Color(0xFF7C4DFF),
+                    child: Text(
+                      (AuthService.nickname ?? '?').characters.first,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
                   ),
-                ),
+                  const SizedBox(width: 12),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        AuthService.nickname ?? '',
+                        style: const TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      Text(
+                        '@${AuthService.userName ?? ''}',
+                        style: TextStyle(fontSize: 13, color: Colors.grey[600]),
+                      ),
+                    ],
+                  ),
+                ],
               ),
-              ListTile(
-                leading: const Icon(Icons.photo_camera),
-                title: const Text('카메라로 촬영'),
-                onTap: () {
-                  final name = nameController.text.trim();
-                  _saveName(name);
-                  Navigator.pop(context);
-                  _takePhoto(name);
-                },
-              ),
-              ListTile(
-                leading: const Icon(Icons.photo_library),
-                title: const Text('갤러리에서 선택 (여러 장)'),
-                onTap: () {
-                  final name = nameController.text.trim();
-                  _saveName(name);
-                  Navigator.pop(context);
-                  _pickMultiplePhotos(name);
-                },
-              ),
-            ],
-          ),
+            ),
+            const Divider(),
+            ListTile(
+              leading: const Icon(Icons.group),
+              title: const Text('멤버 목록'),
+              onTap: () {
+                Navigator.pop(context);
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const MembersScreen()),
+                );
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.logout, color: Colors.red),
+              title: const Text('로그아웃', style: TextStyle(color: Colors.red)),
+              onTap: () async {
+                final nav = Navigator.of(context);
+                nav.pop();
+                await AuthService.logout();
+                if (mounted) {
+                  nav.pushReplacement(
+                    MaterialPageRoute(builder: (_) => const LoginScreen()),
+                  );
+                }
+              },
+            ),
+          ],
         ),
       ),
     );
@@ -209,7 +271,18 @@ class _HomeScreenState extends State<HomeScreen> {
       ),
       bottomNavigationBar: NavigationBar(
         selectedIndex: _currentTab,
-        onDestinationSelected: (index) => setState(() => _currentTab = index),
+        onDestinationSelected: (index) {
+          setState(() => _currentTab = index);
+          // Reload the selected tab
+          switch (index) {
+            case 0:
+              _recentKey.currentState?.reload();
+            case 1:
+              _galleryKey.currentState?.reload();
+            case 2:
+              _favoritesKey.currentState?.reload();
+          }
+        },
         destinations: const [
           NavigationDestination(
             icon: Icon(Icons.schedule_outlined),
@@ -228,18 +301,42 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
         ],
       ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: _isUploading ? null : _showUploadOptions,
-        child: _isUploading
-            ? const SizedBox(
-                width: 24,
-                height: 24,
-                child: CircularProgressIndicator(
-                  color: Colors.white,
-                  strokeWidth: 2,
-                ),
-              )
-            : const Icon(Icons.add_a_photo),
+      floatingActionButton: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          // Menu button (small)
+          FloatingActionButton.small(
+            heroTag: 'menu',
+            onPressed: _showMenu,
+            backgroundColor: Colors.white,
+            child: Text(
+              (AuthService.nickname ?? '?').characters.first,
+              style: const TextStyle(
+                fontWeight: FontWeight.bold,
+                color: Color(0xFF7C4DFF),
+                fontSize: 16,
+              ),
+            ),
+          ),
+          if (AuthService.canUpload) ...[
+            const SizedBox(height: 8),
+            // Upload button
+            FloatingActionButton(
+              heroTag: 'upload',
+              onPressed: _isUploading ? null : _showUploadOptions,
+              child: _isUploading
+                  ? const SizedBox(
+                      width: 24,
+                      height: 24,
+                      child: CircularProgressIndicator(
+                        color: Colors.white,
+                        strokeWidth: 2,
+                      ),
+                    )
+                  : const Icon(Icons.add_a_photo),
+            ),
+          ],
+        ],
       ),
     );
   }

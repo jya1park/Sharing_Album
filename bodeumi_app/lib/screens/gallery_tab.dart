@@ -3,16 +3,16 @@ import 'package:intl/intl.dart';
 
 import '../models/photo.dart';
 import '../services/api_service.dart';
+import '../utils/media_helper.dart';
 import '../widgets/photo_grid.dart';
-import 'photo_view_screen.dart';
 
 const _gradientDecoration = BoxDecoration(
   gradient: LinearGradient(
     begin: Alignment.topCenter,
     end: Alignment.bottomCenter,
     colors: [
-      Color(0xFFF3E8FF), // 연한 라벤더
-      Color(0xFFFCE4EC), // 연한 핑크
+      Color(0xFFF3E8FF),
+      Color(0xFFFCE4EC),
     ],
   ),
 );
@@ -83,33 +83,73 @@ class GalleryTabState extends State<GalleryTab> {
     } catch (_) {}
   }
 
-  String _formatMonth(String month) {
+  String _formatYear(String month) {
     try {
       final date = DateFormat('yyyy-MM').parse(month);
-      return DateFormat('yyyy년 M월').format(date);
+      return DateFormat('yyyy년').format(date);
     } catch (_) {
       return month;
     }
   }
 
+  String _formatShortMonth(String month) {
+    try {
+      final date = DateFormat('yyyy-MM').parse(month);
+      return DateFormat('M월').format(date);
+    } catch (_) {
+      return month;
+    }
+  }
+
+  /// Get visible month indices: up to 5, centered on current page
+  List<int> _getVisibleMonthIndices() {
+    if (_months.isEmpty) return [];
+    final total = _months.length;
+    const windowSize = 5;
+
+    int start = _currentPage - 2;
+    int end = _currentPage + 2;
+
+    // Adjust window to stay within bounds
+    if (start < 0) {
+      end = (end - start).clamp(0, total - 1);
+      start = 0;
+    }
+    if (end >= total) {
+      start = (start - (end - total + 1)).clamp(0, total - 1);
+      end = total - 1;
+    }
+
+    // Limit to windowSize
+    if (end - start + 1 > windowSize) {
+      end = start + windowSize - 1;
+    }
+
+    return List.generate(end - start + 1, (i) => start + i);
+  }
+
+  void _goToPage(int index) {
+    _pageController.animateToPage(
+      index,
+      duration: const Duration(milliseconds: 300),
+      curve: Curves.easeInOut,
+    );
+  }
+
   void _openPhotoView(List<Photo> photos, int index) {
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (context) => PhotoViewScreen(
-          photos: photos,
-          initialIndex: index,
-          onDelete: (photo) async {
-            await ApiService.deletePhoto(photo.id);
-            reload();
-          },
-          onFavoriteToggle: (photo) async {
-            final updated = await ApiService.toggleFavorite(photo.id);
-            widget.onFavoriteChanged();
-            return updated;
-          },
-        ),
-      ),
+    openMedia(
+      context: context,
+      photos: photos,
+      index: index,
+      onDelete: (photo) async {
+        await ApiService.deletePhoto(photo.id);
+        reload();
+      },
+      onFavoriteToggle: (photo) async {
+        final updated = await ApiService.toggleFavorite(photo.id);
+        widget.onFavoriteChanged();
+        return updated;
+      },
     );
   }
 
@@ -144,51 +184,90 @@ class GalleryTabState extends State<GalleryTab> {
                     )
                   : Column(
                       children: [
-                        // Month indicator
+                        // Year label
                         Padding(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 16, vertical: 8),
+                          padding: const EdgeInsets.only(top: 4),
+                          child: Text(
+                            _formatYear(_months[_currentPage]),
+                            style: TextStyle(
+                              fontSize: 14,
+                              color: Colors.grey[600],
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ),
+
+                        // 5-month tab navigation
+                        Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
                           child: Row(
                             children: [
+                              // Left arrow (go to newer / lower index)
                               IconButton(
-                                icon: const Icon(Icons.chevron_left),
-                                onPressed: _currentPage < _months.length - 1
-                                    ? () => _pageController.nextPage(
-                                          duration:
-                                              const Duration(milliseconds: 300),
-                                          curve: Curves.easeInOut,
-                                        )
+                                icon: const Icon(Icons.chevron_left, size: 20),
+                                padding: EdgeInsets.zero,
+                                constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                                onPressed: _currentPage > 0
+                                    ? () => _goToPage(_currentPage - 1)
                                     : null,
                               ),
+
+                              // Month tabs
                               Expanded(
-                                child: Text(
-                                  _formatMonth(_months[_currentPage]),
-                                  textAlign: TextAlign.center,
-                                  style: Theme.of(context)
-                                      .textTheme
-                                      .titleLarge
-                                      ?.copyWith(fontWeight: FontWeight.bold),
+                                child: Row(
+                                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                                  children: _getVisibleMonthIndices().map((index) {
+                                    final isSelected = index == _currentPage;
+                                    return Expanded(
+                                      child: GestureDetector(
+                                        onTap: () => _goToPage(index),
+                                        child: Container(
+                                          padding: const EdgeInsets.symmetric(vertical: 8),
+                                          margin: const EdgeInsets.symmetric(horizontal: 2),
+                                          decoration: BoxDecoration(
+                                            color: isSelected
+                                                ? const Color(0xFF7C4DFF).withAlpha(30)
+                                                : Colors.transparent,
+                                            borderRadius: BorderRadius.circular(20),
+                                            border: isSelected
+                                                ? Border.all(color: const Color(0xFF7C4DFF), width: 1.5)
+                                                : null,
+                                          ),
+                                          child: Text(
+                                            _formatShortMonth(_months[index]),
+                                            textAlign: TextAlign.center,
+                                            style: TextStyle(
+                                              fontSize: 14,
+                                              fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                                              color: isSelected
+                                                  ? const Color(0xFF7C4DFF)
+                                                  : Colors.grey[700],
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                    );
+                                  }).toList(),
                                 ),
                               ),
+
+                              // Right arrow (go to older / higher index)
                               IconButton(
-                                icon: const Icon(Icons.chevron_right),
-                                onPressed: _currentPage > 0
-                                    ? () => _pageController.previousPage(
-                                          duration:
-                                              const Duration(milliseconds: 300),
-                                          curve: Curves.easeInOut,
-                                        )
+                                icon: const Icon(Icons.chevron_right, size: 20),
+                                padding: EdgeInsets.zero,
+                                constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                                onPressed: _currentPage < _months.length - 1
+                                    ? () => _goToPage(_currentPage + 1)
                                     : null,
                               ),
                             ],
                           ),
                         ),
 
-                        // Swipeable month pages
+                        // Swipeable month pages (no reverse: left=newest, right=oldest)
                         Expanded(
                           child: PageView.builder(
                             controller: _pageController,
-                            reverse: true,
                             itemCount: _months.length,
                             onPageChanged: (index) {
                               setState(() => _currentPage = index);

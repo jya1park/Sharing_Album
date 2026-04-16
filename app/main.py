@@ -5,7 +5,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import PHOTOS_DIR
 from app.database import create_db_and_tables
-from app.routers import photos
+from app.routers import auth, photos
 
 # Register HEIC/HEIF support
 try:
@@ -37,6 +37,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+app.include_router(auth.router, prefix="/auth", tags=["Auth"])
 app.include_router(photos.router, prefix="/photos", tags=["Photos"])
 
 

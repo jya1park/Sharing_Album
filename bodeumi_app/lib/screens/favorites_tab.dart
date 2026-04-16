@@ -2,8 +2,8 @@ import 'package:flutter/material.dart';
 
 import '../models/photo.dart';
 import '../services/api_service.dart';
+import '../utils/media_helper.dart';
 import '../widgets/photo_grid.dart';
-import 'photo_view_screen.dart';
 
 const _gradientDecoration = BoxDecoration(
   gradient: LinearGradient(
@@ -51,24 +51,20 @@ class FavoritesTabState extends State<FavoritesTab> {
   }
 
   void _openPhotoView(int index) {
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (context) => PhotoViewScreen(
-          photos: _photos,
-          initialIndex: index,
-          onDelete: (photo) async {
-            await ApiService.deletePhoto(photo.id);
-            widget.onFavoriteChanged();
-            reload();
-          },
-          onFavoriteToggle: (photo) async {
-            final updated = await ApiService.toggleFavorite(photo.id);
-            widget.onFavoriteChanged();
-            return updated;
-          },
-        ),
-      ),
+    openMedia(
+      context: context,
+      photos: _photos,
+      index: index,
+      onDelete: (photo) async {
+        await ApiService.deletePhoto(photo.id);
+        widget.onFavoriteChanged();
+        reload();
+      },
+      onFavoriteToggle: (photo) async {
+        final updated = await ApiService.toggleFavorite(photo.id);
+        widget.onFavoriteChanged();
+        return updated;
+      },
     );
   }
 
