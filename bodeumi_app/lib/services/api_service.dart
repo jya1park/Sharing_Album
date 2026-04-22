@@ -85,7 +85,7 @@ class ApiService {
   }
 
   /// Upload a photo file (auth token provides uploader name)
-  static Future<Photo> uploadPhoto(File file) async {
+  static Future<Photo> uploadPhoto(File file, {List<String>? visibleTo}) async {
     final request = http.MultipartRequest(
       'POST',
       Uri.parse('$_base/photos/upload'),
@@ -94,6 +94,9 @@ class ApiService {
       request.headers['Authorization'] = 'Bearer ${AuthService.token}';
     }
     request.files.add(await http.MultipartFile.fromPath('file', file.path));
+    if (visibleTo != null && visibleTo.isNotEmpty) {
+      request.fields['visible_to'] = visibleTo.join(',');
+    }
 
     final streamedResponse = await request.send();
     final response = await http.Response.fromStream(streamedResponse);
@@ -105,6 +108,21 @@ class ApiService {
       throw DuplicatePhotoException();
     }
     throw Exception('Upload failed: ${response.statusCode} ${response.body}');
+  }
+
+  static Future<Photo> updateVisibility(String photoId, List<String> visibleTo) async {
+    final response = await http.put(
+      Uri.parse('$_base/photos/$photoId/visibility'),
+      headers: {
+        ..._authHeaders,
+        'Content-Type': 'application/json',
+      },
+      body: jsonEncode(visibleTo),
+    );
+    if (response.statusCode == 200) {
+      return Photo.fromJson(jsonDecode(response.body));
+    }
+    throw Exception('Visibility update failed: ${response.statusCode}');
   }
 
   /// Delete a photo by ID

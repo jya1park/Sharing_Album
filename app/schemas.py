@@ -58,6 +58,7 @@ class PhotoResponse(BaseModel):
     media_type: str = "photo"
     is_favorite: bool = False
     uploader_name: str = ""
+    visible_to: Optional[list[str]] = None
 
 
 class PhotoListResponse(BaseModel):

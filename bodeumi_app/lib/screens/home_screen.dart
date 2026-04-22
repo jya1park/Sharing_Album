@@ -45,18 +45,11 @@ class _HomeScreenState extends State<HomeScreen> {
     await _uploadFiles([picked]);
   }
 
-  Future<void> _pickMultiplePhotos() async {
+  Future<void> _pickMedia() async {
     final picker = ImagePicker();
-    final picked = await picker.pickMultiImage(imageQuality: 100);
+    final picked = await picker.pickMultipleMedia();
     if (picked.isEmpty) return;
     await _uploadFiles(picked);
-  }
-
-  Future<void> _pickVideo() async {
-    final picker = ImagePicker();
-    final picked = await picker.pickVideo(source: ImageSource.gallery);
-    if (picked == null) return;
-    await _uploadFiles([picked]);
   }
 
   Future<void> _uploadFiles(List<XFile> files) async {
@@ -127,18 +120,10 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
             ListTile(
               leading: const Icon(Icons.photo_library),
-              title: const Text('갤러리에서 사진 선택 (여러 장)'),
+              title: const Text('갤러리에서 선택 (사진+동영상)'),
               onTap: () {
                 Navigator.pop(context);
-                _pickMultiplePhotos();
-              },
-            ),
-            ListTile(
-              leading: const Icon(Icons.video_library),
-              title: const Text('갤러리에서 동영상 선택'),
-              onTap: () {
-                Navigator.pop(context);
-                _pickVideo();
+                _pickMedia();
               },
             ),
           ],

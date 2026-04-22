@@ -38,6 +38,7 @@ class Photo(SQLModel, table=True):
     media_type: str = Field(default="photo")  # "photo" or "video"
     is_favorite: bool = Field(default=False, index=True)
     uploader_name: str = Field(default="")
+    visible_to: Optional[str] = Field(default=None)  # null=all, comma-separated user IDs
 
     album_id: Optional[str] = Field(default=None, index=True)
     uploader_id: Optional[str] = Field(default=None, index=True)

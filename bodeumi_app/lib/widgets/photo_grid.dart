@@ -67,6 +67,16 @@ class PhotoGrid extends StatelessWidget {
                         ),
                       ),
                     ),
+                  if (photo.isPrivate)
+                    Positioned(
+                      left: 4,
+                      top: 4,
+                      child: Icon(
+                        Icons.lock,
+                        color: Colors.white.withAlpha(200),
+                        size: 14,
+                      ),
+                    ),
                   if (showFavoriteIcon || photo.isFavorite)
                     const Positioned(
                       right: 4,

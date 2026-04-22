@@ -10,6 +10,7 @@ class Photo {
   final String mediaType;
   final bool isFavorite;
   final String uploaderName;
+  final List<String>? visibleTo;
 
   Photo({
     required this.id,
@@ -23,9 +24,11 @@ class Photo {
     this.mediaType = 'photo',
     this.isFavorite = false,
     this.uploaderName = '',
+    this.visibleTo,
   });
 
   bool get isVideo => mediaType == 'video';
+  bool get isPrivate => visibleTo != null && visibleTo!.isNotEmpty;
 
   factory Photo.fromJson(Map<String, dynamic> json) {
     return Photo(
@@ -40,10 +43,13 @@ class Photo {
       mediaType: json['media_type'] ?? 'photo',
       isFavorite: json['is_favorite'] ?? false,
       uploaderName: json['uploader_name'] ?? '',
+      visibleTo: json['visible_to'] != null
+          ? List<String>.from(json['visible_to'])
+          : null,
     );
   }
 
-  Photo copyWith({bool? isFavorite}) {
+  Photo copyWith({bool? isFavorite, List<String>? visibleTo}) {
     return Photo(
       id: id,
       originalFilename: originalFilename,
@@ -56,6 +62,7 @@ class Photo {
       mediaType: mediaType,
       isFavorite: isFavorite ?? this.isFavorite,
       uploaderName: uploaderName,
+      visibleTo: visibleTo ?? this.visibleTo,
     );
   }
 }
