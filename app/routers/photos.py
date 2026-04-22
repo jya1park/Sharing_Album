@@ -84,21 +84,27 @@ async def upload_photo(
 
     is_video = ext in ALLOWED_VIDEO_EXTENSIONS
 
-    content = await file.read()
-    if len(content) > MAX_FILE_SIZE_BYTES:
-        raise HTTPException(
-            status_code=400,
-            detail=f"File too large. Maximum size: {MAX_FILE_SIZE_BYTES // (1024 * 1024)}MB",
-        )
+    # Stream to temp file and compute hash simultaneously
+    md5 = hashlib.md5()
+    file_size_raw = 0
+    with tempfile.NamedTemporaryFile(delete=False, suffix=f".{ext}") as tmp:
+        while chunk := await file.read(1024 * 1024):
+            file_size_raw += len(chunk)
+            if file_size_raw > MAX_FILE_SIZE_BYTES:
+                Path(tmp.name).unlink(missing_ok=True)
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"File too large. Maximum size: {MAX_FILE_SIZE_BYTES // (1024 * 1024)}MB",
+                )
+            md5.update(chunk)
+            tmp.write(chunk)
+        tmp_path = Path(tmp.name)
 
-    file_hash = hashlib.md5(content).hexdigest()
+    file_hash = md5.hexdigest()
     existing = session.exec(select(Photo).where(Photo.file_hash == file_hash)).first()
     if existing:
+        tmp_path.unlink(missing_ok=True)
         raise HTTPException(status_code=409, detail="This file has already been uploaded")
-
-    with tempfile.NamedTemporaryFile(delete=False, suffix=f".{ext}") as tmp:
-        tmp.write(content)
-        tmp_path = Path(tmp.name)
 
     try:
         now = datetime.now(timezone(timedelta(hours=9))).replace(tzinfo=None)
@@ -129,7 +135,7 @@ async def upload_photo(
             # Save video as-is
             original_dir.mkdir(parents=True, exist_ok=True)
             shutil.copy2(str(tmp_path), str(original_path))
-            file_size = len(content)
+            file_size = file_size_raw
             # Generate thumbnail from first frame
             generate_video_thumbnail(tmp_path, thumbnail_path)
         else:
