@@ -251,7 +251,8 @@ async def update_visibility(
     photo = session.get(Photo, photo_id)
     if not photo:
         raise HTTPException(status_code=404, detail="Photo not found")
-    if photo.uploader_id != user.id and user.role != "admin":
+    is_owner = photo.uploader_id == user.id
+    if user.role != "admin" and not (is_owner and user.can_set_visibility):
         raise HTTPException(status_code=403, detail="Permission denied")
 
     photo.visible_to = ",".join(visible_to) if visible_to else None

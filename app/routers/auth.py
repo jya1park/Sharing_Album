@@ -23,6 +23,7 @@ def _token_response(user: User) -> TokenResponse:
         can_upload=user.can_upload,
         can_delete=user.can_delete,
         can_download=user.can_download,
+        can_set_visibility=user.can_set_visibility,
     )
 
 
@@ -35,6 +36,7 @@ def _user_response(user: User) -> UserResponse:
         can_upload=user.can_upload,
         can_delete=user.can_delete,
         can_download=user.can_download,
+        can_set_visibility=user.can_set_visibility,
         created_at=user.created_at,
     )
 
@@ -112,6 +114,8 @@ async def update_permissions(
         target.can_upload = req.can_upload
     if req.can_delete is not None:
         target.can_delete = req.can_delete
+    if req.can_set_visibility is not None:
+        target.can_set_visibility = req.can_set_visibility
     if req.can_download is not None:
         target.can_download = req.can_download
 

@@ -56,6 +56,7 @@ def _migrate():
             ("can_upload", "1"),
             ("can_delete", "1"),
             ("can_download", "1"),
+            ("can_set_visibility", "0"),
         ]:
             if col not in columns:
                 cursor.execute(f"ALTER TABLE user ADD COLUMN {col} TEXT DEFAULT {default}")

@@ -26,6 +26,7 @@ class TokenResponse(BaseModel):
     can_upload: bool = True
     can_delete: bool = True
     can_download: bool = True
+    can_set_visibility: bool = False
 
 
 class UserResponse(BaseModel):
@@ -36,6 +37,7 @@ class UserResponse(BaseModel):
     can_upload: bool = True
     can_delete: bool = True
     can_download: bool = True
+    can_set_visibility: bool = False
     created_at: datetime
 
 
@@ -43,6 +45,7 @@ class UpdatePermissionRequest(BaseModel):
     can_upload: Optional[bool] = None
     can_delete: Optional[bool] = None
     can_download: Optional[bool] = None
+    can_set_visibility: Optional[bool] = None
 
 
 # Photo schemas

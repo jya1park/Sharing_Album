@@ -358,12 +358,13 @@ class _PhotoViewScreenState extends State<PhotoViewScreen> {
             ),
             onPressed: _toggleFavorite,
           ),
-          IconButton(
-            icon: Icon(
-              _currentPhoto.isPrivate ? Icons.lock : Icons.lock_open,
-              size: 20,
-            ),
-            onPressed: _showVisibilityDialog,
+          if (AuthService.canSetVisibility)
+            IconButton(
+              icon: Icon(
+                _currentPhoto.isPrivate ? Icons.lock : Icons.lock_open,
+                size: 20,
+              ),
+              onPressed: _showVisibilityDialog,
           ),
           IconButton(
             icon: const Icon(Icons.info_outline),

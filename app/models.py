@@ -20,6 +20,7 @@ class User(SQLModel, table=True):
     can_upload: bool = Field(default=True)
     can_delete: bool = Field(default=True)
     can_download: bool = Field(default=True)
+    can_set_visibility: bool = Field(default=False)
     created_at: datetime = Field(default_factory=_now_kst)
 
 
