@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:dio/dio.dart';
 import 'package:http/http.dart' as http;
 
 import '../config.dart';
@@ -84,30 +85,41 @@ class ApiService {
     throw Exception('Toggle favorite failed: ${response.statusCode}');
   }
 
-  /// Upload a photo file (auth token provides uploader name)
-  static Future<Photo> uploadPhoto(File file, {List<String>? visibleTo}) async {
-    final request = http.MultipartRequest(
-      'POST',
-      Uri.parse('$_base/photos/upload'),
-    );
-    if (AuthService.token != null) {
-      request.headers['Authorization'] = 'Bearer ${AuthService.token}';
-    }
-    request.files.add(await http.MultipartFile.fromPath('file', file.path));
-    if (visibleTo != null && visibleTo.isNotEmpty) {
-      request.fields['visible_to'] = visibleTo.join(',');
-    }
+  /// Upload a photo/video file with progress callback
+  static Future<Photo> uploadPhoto(
+    File file, {
+    List<String>? visibleTo,
+    void Function(double progress)? onProgress,
+  }) async {
+    final dio = Dio();
+    dio.options.headers['Authorization'] = 'Bearer ${AuthService.token}';
 
-    final streamedResponse = await request.send();
-    final response = await http.Response.fromStream(streamedResponse);
+    final formData = FormData.fromMap({
+      'file': await MultipartFile.fromFile(file.path, filename: file.path.split('/').last),
+      if (visibleTo != null && visibleTo.isNotEmpty) 'visible_to': visibleTo.join(','),
+    });
 
-    if (response.statusCode == 201) {
-      return Photo.fromJson(jsonDecode(response.body));
+    try {
+      final response = await dio.post(
+        '$_base/photos/upload',
+        data: formData,
+        onSendProgress: (sent, total) {
+          if (total > 0 && onProgress != null) {
+            onProgress(sent / total);
+          }
+        },
+      );
+
+      if (response.statusCode == 201) {
+        return Photo.fromJson(response.data);
+      }
+      throw Exception('Upload failed: ${response.statusCode}');
+    } on DioException catch (e) {
+      if (e.response?.statusCode == 409) {
+        throw DuplicatePhotoException();
+      }
+      throw Exception('Upload failed: ${e.message}');
     }
-    if (response.statusCode == 409) {
-      throw DuplicatePhotoException();
-    }
-    throw Exception('Upload failed: ${response.statusCode} ${response.body}');
   }
 
   static Future<Photo> updateVisibility(String photoId, List<String> visibleTo) async {

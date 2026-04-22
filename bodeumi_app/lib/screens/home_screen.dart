@@ -23,6 +23,8 @@ class _HomeScreenState extends State<HomeScreen> {
   bool _isUploading = false;
   int _uploadTotal = 0;
   int _uploadDone = 0;
+  double _currentFileProgress = 0.0;
+  String _currentFileName = '';
 
   final _galleryKey = GlobalKey<GalleryTabState>();
   final _recentKey = GlobalKey<RecentTabState>();
@@ -63,8 +65,17 @@ class _HomeScreenState extends State<HomeScreen> {
     int failed = 0;
 
     for (final file in files) {
+      setState(() {
+        _currentFileProgress = 0.0;
+        _currentFileName = file.name;
+      });
       try {
-        await ApiService.uploadPhoto(File(file.path));
+        await ApiService.uploadPhoto(
+          File(file.path),
+          onProgress: (progress) {
+            setState(() => _currentFileProgress = progress);
+          },
+        );
       } on DuplicatePhotoException {
         skipped++;
       } catch (e) {
@@ -223,11 +234,11 @@ class _HomeScreenState extends State<HomeScreen> {
               child: Column(
                 children: [
                   LinearProgressIndicator(
-                    value: _uploadTotal > 0 ? _uploadDone / _uploadTotal : null,
+                    value: _currentFileProgress,
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    '$_uploadDone / $_uploadTotal 업로드 중...',
+                    '$_currentFileName  (${_uploadDone + 1}/$_uploadTotal)  ${(_currentFileProgress * 100).toInt()}%',
                     style: Theme.of(context).textTheme.bodySmall,
                   ),
                 ],
