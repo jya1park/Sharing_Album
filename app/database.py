@@ -37,6 +37,10 @@ def _migrate():
             cursor.execute("ALTER TABLE photo ADD COLUMN media_type TEXT DEFAULT 'photo'")
             conn.commit()
 
+        if "visible_to" not in columns:
+            cursor.execute("ALTER TABLE photo ADD COLUMN visible_to TEXT DEFAULT NULL")
+            conn.commit()
+
     # Migrate user table
     cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='user'")
     if cursor.fetchone():
@@ -52,6 +56,7 @@ def _migrate():
             ("can_upload", "1"),
             ("can_delete", "1"),
             ("can_download", "1"),
+            ("can_set_visibility", "0"),
         ]:
             if col not in columns:
                 cursor.execute(f"ALTER TABLE user ADD COLUMN {col} TEXT DEFAULT {default}")

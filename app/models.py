@@ -20,6 +20,7 @@ class User(SQLModel, table=True):
     can_upload: bool = Field(default=True)
     can_delete: bool = Field(default=True)
     can_download: bool = Field(default=True)
+    can_set_visibility: bool = Field(default=False)
     created_at: datetime = Field(default_factory=_now_kst)
 
 
@@ -38,6 +39,7 @@ class Photo(SQLModel, table=True):
     media_type: str = Field(default="photo")  # "photo" or "video"
     is_favorite: bool = Field(default=False, index=True)
     uploader_name: str = Field(default="")
+    visible_to: Optional[str] = Field(default=None)  # null=all, comma-separated user IDs
 
     album_id: Optional[str] = Field(default=None, index=True)
     uploader_id: Optional[str] = Field(default=None, index=True)

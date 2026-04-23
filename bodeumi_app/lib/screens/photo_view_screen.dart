@@ -179,6 +179,104 @@ class _PhotoViewScreenState extends State<PhotoViewScreen> {
     );
   }
 
+  Future<void> _showVisibilityDialog() async {
+    List<Map<String, dynamic>> users;
+    try {
+      users = await AuthService.getUsers();
+    } catch (_) {
+      return;
+    }
+
+    final currentVisible = Set<String>.from(_currentPhoto.visibleTo ?? []);
+    final isPublic = currentVisible.isEmpty;
+
+    if (!mounted) return;
+
+    await showDialog(
+      context: context,
+      builder: (context) {
+        bool allPublic = isPublic;
+        final selected = Set<String>.from(currentVisible);
+
+        return StatefulBuilder(
+          builder: (context, setDialogState) => AlertDialog(
+            title: const Text('공개 범위'),
+            content: SizedBox(
+              width: double.maxFinite,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  SwitchListTile(
+                    title: const Text('전체 공개'),
+                    value: allPublic,
+                    onChanged: (v) => setDialogState(() {
+                      allPublic = v;
+                      if (v) selected.clear();
+                    }),
+                  ),
+                  if (!allPublic) ...[
+                    const Divider(),
+                    const Text('볼 수 있는 사람 선택:', style: TextStyle(fontSize: 13)),
+                    const SizedBox(height: 8),
+                    ...users.map((u) {
+                      final uid = u['id'] as String;
+                      final nickname = (u['nickname'] ?? u['name'] ?? '').toString();
+                      return CheckboxListTile(
+                        title: Text(nickname),
+                        value: selected.contains(uid),
+                        onChanged: (v) => setDialogState(() {
+                          if (v == true) {
+                            selected.add(uid);
+                          } else {
+                            selected.remove(uid);
+                          }
+                        }),
+                        dense: true,
+                      );
+                    }),
+                  ],
+                ],
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('취소'),
+              ),
+              TextButton(
+                onPressed: () async {
+                  final nav = Navigator.of(context);
+                  final messenger = ScaffoldMessenger.of(context);
+                  nav.pop();
+                  try {
+                    final newVisible = allPublic ? <String>[] : selected.toList();
+                    await ApiService.updateVisibility(_currentPhoto.id, newVisible);
+                    setState(() {
+                      _photos[_currentIndex] = _currentPhoto.copyWith(
+                        visibleTo: newVisible.isEmpty ? null : newVisible,
+                      );
+                    });
+                    messenger.showSnackBar(
+                      SnackBar(
+                        content: Text(allPublic ? '전체 공개로 변경됨' : '${selected.length}명에게만 공개'),
+                        backgroundColor: Colors.green,
+                      ),
+                    );
+                  } catch (e) {
+                    messenger.showSnackBar(
+                      SnackBar(content: Text('변경 실패: $e'), backgroundColor: Colors.red),
+                    );
+                  }
+                },
+                child: const Text('저장'),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
   void _showInfoSheet() {
     final photo = _currentPhoto;
     showModalBottomSheet(
@@ -259,6 +357,14 @@ class _PhotoViewScreenState extends State<PhotoViewScreen> {
               color: _currentPhoto.isFavorite ? Colors.redAccent : Colors.white,
             ),
             onPressed: _toggleFavorite,
+          ),
+          if (AuthService.canSetVisibility)
+            IconButton(
+              icon: Icon(
+                _currentPhoto.isPrivate ? Icons.lock : Icons.lock_open,
+                size: 20,
+              ),
+              onPressed: _showVisibilityDialog,
           ),
           IconButton(
             icon: const Icon(Icons.info_outline),

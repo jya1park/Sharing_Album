@@ -23,6 +23,8 @@ class _HomeScreenState extends State<HomeScreen> {
   bool _isUploading = false;
   int _uploadTotal = 0;
   int _uploadDone = 0;
+  double _currentFileProgress = 0.0;
+  String _currentFileName = '';
 
   final _galleryKey = GlobalKey<GalleryTabState>();
   final _recentKey = GlobalKey<RecentTabState>();
@@ -45,18 +47,11 @@ class _HomeScreenState extends State<HomeScreen> {
     await _uploadFiles([picked]);
   }
 
-  Future<void> _pickMultiplePhotos() async {
+  Future<void> _pickMedia() async {
     final picker = ImagePicker();
-    final picked = await picker.pickMultiImage(imageQuality: 100);
+    final picked = await picker.pickMultipleMedia();
     if (picked.isEmpty) return;
     await _uploadFiles(picked);
-  }
-
-  Future<void> _pickVideo() async {
-    final picker = ImagePicker();
-    final picked = await picker.pickVideo(source: ImageSource.gallery);
-    if (picked == null) return;
-    await _uploadFiles([picked]);
   }
 
   Future<void> _uploadFiles(List<XFile> files) async {
@@ -70,8 +65,17 @@ class _HomeScreenState extends State<HomeScreen> {
     int failed = 0;
 
     for (final file in files) {
+      setState(() {
+        _currentFileProgress = 0.0;
+        _currentFileName = file.name;
+      });
       try {
-        await ApiService.uploadPhoto(File(file.path));
+        await ApiService.uploadPhoto(
+          File(file.path),
+          onProgress: (progress) {
+            setState(() => _currentFileProgress = progress);
+          },
+        );
       } on DuplicatePhotoException {
         skipped++;
       } catch (e) {
@@ -127,18 +131,10 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
             ListTile(
               leading: const Icon(Icons.photo_library),
-              title: const Text('갤러리에서 사진 선택 (여러 장)'),
+              title: const Text('갤러리에서 선택 (사진+동영상)'),
               onTap: () {
                 Navigator.pop(context);
-                _pickMultiplePhotos();
-              },
-            ),
-            ListTile(
-              leading: const Icon(Icons.video_library),
-              title: const Text('갤러리에서 동영상 선택'),
-              onTap: () {
-                Navigator.pop(context);
-                _pickVideo();
+                _pickMedia();
               },
             ),
           ],
@@ -238,11 +234,11 @@ class _HomeScreenState extends State<HomeScreen> {
               child: Column(
                 children: [
                   LinearProgressIndicator(
-                    value: _uploadTotal > 0 ? _uploadDone / _uploadTotal : null,
+                    value: _currentFileProgress,
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    '$_uploadDone / $_uploadTotal 업로드 중...',
+                    '$_currentFileName  (${_uploadDone + 1}/$_uploadTotal)  ${(_currentFileProgress * 100).toInt()}%',
                     style: Theme.of(context).textTheme.bodySmall,
                   ),
                 ],

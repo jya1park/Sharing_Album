@@ -23,6 +23,7 @@ class AuthService {
   static bool _canUpload = true;
   static bool _canDelete = true;
   static bool _canDownload = true;
+  static bool _canSetVisibility = false;
 
   static String? get token => _token;
   static String? get userId => _userId;
@@ -33,6 +34,7 @@ class AuthService {
   static bool get canUpload => _canUpload;
   static bool get canDelete => _canDelete;
   static bool get canDownload => _canDownload;
+  static bool get canSetVisibility => _canSetVisibility || _role == 'admin';
   static bool get isLoggedIn => _token != null;
 
   static Future<bool> loadSavedAuth() async {
@@ -45,6 +47,7 @@ class AuthService {
     _canUpload = prefs.getBool(_canUploadKey) ?? true;
     _canDelete = prefs.getBool(_canDeleteKey) ?? true;
     _canDownload = prefs.getBool(_canDownloadKey) ?? true;
+    _canSetVisibility = prefs.getBool('auth_can_set_visibility') ?? false;
 
     if (_token == null) return false;
 
@@ -60,6 +63,7 @@ class AuthService {
         _canUpload = data['can_upload'] ?? _canUpload;
         _canDelete = data['can_delete'] ?? _canDelete;
         _canDownload = data['can_download'] ?? _canDownload;
+        _canSetVisibility = data['can_set_visibility'] ?? _canSetVisibility;
         await _savePrefs();
         return true;
       }
@@ -139,6 +143,7 @@ class AuthService {
     _canUpload = data['can_upload'] ?? true;
     _canDelete = data['can_delete'] ?? true;
     _canDownload = data['can_download'] ?? true;
+    _canSetVisibility = data['can_set_visibility'] ?? false;
     await _savePrefs();
   }
 
@@ -150,6 +155,7 @@ class AuthService {
     if (_nickname != null) await prefs.setString(_nicknameKey, _nickname!);
     await prefs.setString(_roleKey, _role);
     await prefs.setBool(_canUploadKey, _canUpload);
+    await prefs.setBool('auth_can_set_visibility', _canSetVisibility);
     await prefs.setBool(_canDeleteKey, _canDelete);
     await prefs.setBool(_canDownloadKey, _canDownload);
   }
@@ -163,11 +169,12 @@ class AuthService {
     _canUpload = true;
     _canDelete = true;
     _canDownload = true;
+    _canSetVisibility = false;
     final prefs = await SharedPreferences.getInstance();
     for (final key in [_tokenKey, _userIdKey, _userNameKey, _nicknameKey, _roleKey]) {
       await prefs.remove(key);
     }
-    for (final key in [_canUploadKey, _canDeleteKey, _canDownloadKey]) {
+    for (final key in [_canUploadKey, _canDeleteKey, _canDownloadKey, 'auth_can_set_visibility']) {
       await prefs.remove(key);
     }
   }

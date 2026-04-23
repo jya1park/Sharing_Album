@@ -65,6 +65,7 @@ class _MembersScreenState extends State<MembersScreen> {
     bool canUpload = user['can_upload'] ?? true;
     bool canDelete = user['can_delete'] ?? true;
     bool canDownload = user['can_download'] ?? true;
+    bool canSetVisibility = user['can_set_visibility'] ?? false;
     final userId = user['id'] as String;
 
     showDialog(
@@ -100,6 +101,15 @@ class _MembersScreenState extends State<MembersScreen> {
                 onChanged: (v) {
                   setDialogState(() => canDownload = v);
                   _togglePermission(userId, 'can_download', v);
+                },
+              ),
+              SwitchListTile(
+                title: const Text('공개 설정'),
+                subtitle: const Text('사진/동영상 공개 범위 변경 허용'),
+                value: canSetVisibility,
+                onChanged: (v) {
+                  setDialogState(() => canSetVisibility = v);
+                  _togglePermission(userId, 'can_set_visibility', v);
                 },
               ),
             ],
