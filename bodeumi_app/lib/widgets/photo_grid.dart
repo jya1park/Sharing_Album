@@ -9,7 +9,7 @@ class PhotoGrid extends StatefulWidget {
   final void Function(int index) onTap;
   final Future<void> Function() onRefresh;
   final bool showFavoriteIcon;
-  final void Function(List<Photo> selected)? onBatchAction;
+  final void Function(List<Photo> selected, String action)? onBatchAction;
 
   const PhotoGrid({
     super.key,
@@ -51,6 +51,10 @@ class PhotoGridState extends State<PhotoGrid> {
   List<Photo> get selectedPhotos =>
       widget.photos.where((p) => _selectedIds.contains(p.id)).toList();
 
+  bool get _hasSelection => _selectedIds.isNotEmpty;
+  Color get _activeColor => Colors.white;
+  Color get _inactiveColor => Colors.white54;
+
   @override
   Widget build(BuildContext context) {
     return Column(
@@ -58,36 +62,43 @@ class PhotoGridState extends State<PhotoGrid> {
         if (_isSelecting)
           Container(
             color: const Color(0xFF7C4DFF),
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-            child: Row(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+            child: Column(
               children: [
-                IconButton(
-                  icon: const Icon(Icons.close, color: Colors.white),
-                  onPressed: clearSelection,
+                Row(
+                  children: [
+                    IconButton(
+                      icon: const Icon(Icons.close, color: Colors.white),
+                      onPressed: clearSelection,
+                      visualDensity: VisualDensity.compact,
+                    ),
+                    Text(
+                      '${_selectedIds.length}개 선택',
+                      style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14),
+                    ),
+                    const Spacer(),
+                    IconButton(
+                      icon: const Icon(Icons.select_all, color: Colors.white, size: 20),
+                      tooltip: '전체 선택',
+                      onPressed: () {
+                        setState(() {
+                          for (final p in widget.photos) {
+                            _selectedIds.add(p.id);
+                          }
+                        });
+                      },
+                      visualDensity: VisualDensity.compact,
+                    ),
+                  ],
                 ),
-                Text(
-                  '${_selectedIds.length}개 선택됨',
-                  style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
-                ),
-                const Spacer(),
-                TextButton.icon(
-                  onPressed: () {
-                    // Select all
-                    setState(() {
-                      for (final p in widget.photos) {
-                        _selectedIds.add(p.id);
-                      }
-                    });
-                  },
-                  icon: const Icon(Icons.select_all, color: Colors.white, size: 18),
-                  label: const Text('전체', style: TextStyle(color: Colors.white)),
-                ),
-                TextButton.icon(
-                  onPressed: _selectedIds.isNotEmpty
-                      ? () => widget.onBatchAction?.call(selectedPhotos)
-                      : null,
-                  icon: Icon(Icons.lock, color: _selectedIds.isNotEmpty ? Colors.white : Colors.white54, size: 18),
-                  label: Text('공개 설정', style: TextStyle(color: _selectedIds.isNotEmpty ? Colors.white : Colors.white54)),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                  children: [
+                    _actionButton(Icons.lock, '공개설정', 'visibility'),
+                    _actionButton(Icons.delete_outline, '삭제', 'delete'),
+                    _actionButton(Icons.favorite, '즐겨찾기', 'favorite'),
+                    _actionButton(Icons.download, '다운로드', 'download'),
+                  ],
                 ),
               ],
             ),
@@ -156,7 +167,6 @@ class PhotoGridState extends State<PhotoGrid> {
                           bottom: 4,
                           child: Icon(Icons.favorite, color: Colors.redAccent, size: 16),
                         ),
-                      // Selection overlay
                       if (_isSelecting)
                         Container(
                           color: isSelected
@@ -188,6 +198,27 @@ class PhotoGridState extends State<PhotoGrid> {
           ),
         ),
       ],
+    );
+  }
+
+  Widget _actionButton(IconData icon, String label, String action) {
+    return InkWell(
+      onTap: _hasSelection
+          ? () {
+              widget.onBatchAction?.call(selectedPhotos, action);
+            }
+          : null,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, color: _hasSelection ? _activeColor : _inactiveColor, size: 22),
+            const SizedBox(height: 2),
+            Text(label, style: TextStyle(color: _hasSelection ? _activeColor : _inactiveColor, fontSize: 11)),
+          ],
+        ),
+      ),
     );
   }
 }

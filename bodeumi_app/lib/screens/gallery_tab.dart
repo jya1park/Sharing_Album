@@ -3,9 +3,8 @@ import 'package:intl/intl.dart';
 
 import '../models/photo.dart';
 import '../services/api_service.dart';
-import '../services/auth_service.dart';
+import '../utils/batch_actions.dart';
 import '../utils/media_helper.dart';
-import '../utils/visibility_dialog.dart';
 import '../widgets/photo_grid.dart';
 
 const _gradientDecoration = BoxDecoration(
@@ -136,6 +135,10 @@ class GalleryTabState extends State<GalleryTab> {
       duration: const Duration(milliseconds: 300),
       curve: Curves.easeInOut,
     );
+  }
+
+  void _handleBatchAction(List<Photo> selected, String action) {
+    handleBatchAction(context, selected, action, reload);
   }
 
   void _openPhotoView(List<Photo> photos, int index) {
@@ -303,13 +306,7 @@ class GalleryTabState extends State<GalleryTab> {
                                   _photoCache.remove(month);
                                   await _loadPhotosForPage(index);
                                 },
-                                onBatchAction: AuthService.canSetVisibility
-                                    ? (selected) => showBatchVisibilityDialog(
-                                          context: context,
-                                          photos: selected,
-                                          onDone: reload,
-                                        )
-                                    : null,
+                                onBatchAction: (selected, action) => _handleBatchAction(selected, action),
                               );
                             },
                           ),
