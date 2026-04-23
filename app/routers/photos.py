@@ -19,7 +19,7 @@ from app.config import (
 )
 from app.auth import get_current_user
 from app.database import get_session
-from app.models import Photo, User
+from app.models import Photo, User, UserFavorite
 from app.schemas import PhotoResponse, PhotoListResponse, MonthListResponse, MessageResponse
 from app.utils.exif import extract_taken_date
 from app.utils.image import compress_and_resize, generate_thumbnail
@@ -28,8 +28,15 @@ from app.utils.video import generate_video_thumbnail
 router = APIRouter()
 
 
-def _build_photo_response(photo: Photo) -> PhotoResponse:
+def _build_photo_response(photo: Photo, user_id: str = "", session: Session = None) -> PhotoResponse:
     visible_list = photo.visible_to.split(",") if photo.visible_to else None
+    is_fav = False
+    if session and user_id:
+        fav = session.exec(
+            select(UserFavorite)
+            .where(UserFavorite.user_id == user_id, UserFavorite.photo_id == photo.id)
+        ).first()
+        is_fav = fav is not None
     return PhotoResponse(
         id=photo.id,
         original_filename=photo.original_filename,
@@ -40,7 +47,7 @@ def _build_photo_response(photo: Photo) -> PhotoResponse:
         uploaded_at=photo.uploaded_at,
         month_folder=photo.month_folder,
         media_type=photo.media_type,
-        is_favorite=photo.is_favorite,
+        is_favorite=is_fav,
         uploader_name=photo.uploader_name,
         visible_to=visible_list,
     )
@@ -165,7 +172,7 @@ async def upload_photo(
     session.commit()
     session.refresh(photo)
 
-    return _build_photo_response(photo)
+    return _build_photo_response(photo, user.id, session)
 
 
 @router.get("/months", response_model=MonthListResponse)
@@ -186,7 +193,7 @@ async def list_recent(
     statement = select(Photo).order_by(Photo.uploaded_at.desc()).limit(limit * 2)
     photos = session.exec(statement).all()
     visible = _filter_visible(photos, user.id)
-    return [_build_photo_response(p) for p in visible[:limit]]
+    return [_build_photo_response(p, user.id, session) for p in visible[:limit]]
 
 
 @router.get("/favorites", response_model=list[PhotoResponse])
@@ -194,28 +201,45 @@ async def list_favorites(
     user: User = Depends(get_current_user),
     session: Session = Depends(get_session),
 ):
-    """Get all favorited photos, sorted by most recently favorited first."""
+    """Get current user's favorited photos."""
+    fav_ids = session.exec(
+        select(UserFavorite.photo_id).where(UserFavorite.user_id == user.id)
+    ).all()
+    if not fav_ids:
+        return []
     statement = (
         select(Photo)
-        .where(Photo.is_favorite == True)
+        .where(Photo.id.in_(fav_ids))
         .order_by(Photo.uploaded_at.desc())
     )
     photos = session.exec(statement).all()
     visible = _filter_visible(photos, user.id)
-    return [_build_photo_response(p) for p in visible]
+    return [_build_photo_response(p, user.id, session) for p in visible]
 
 
 @router.put("/{photo_id}/favorite", response_model=PhotoResponse)
-async def toggle_favorite(photo_id: str, session: Session = Depends(get_session)):
-    """Toggle favorite status of a photo."""
+async def toggle_favorite(
+    photo_id: str,
+    user: User = Depends(get_current_user),
+    session: Session = Depends(get_session),
+):
+    """Toggle favorite status for current user."""
     photo = session.get(Photo, photo_id)
     if not photo:
         raise HTTPException(status_code=404, detail="Photo not found")
-    photo.is_favorite = not photo.is_favorite
-    session.add(photo)
+
+    existing = session.exec(
+        select(UserFavorite)
+        .where(UserFavorite.user_id == user.id, UserFavorite.photo_id == photo_id)
+    ).first()
+
+    if existing:
+        session.delete(existing)
+    else:
+        session.add(UserFavorite(user_id=user.id, photo_id=photo_id))
+
     session.commit()
-    session.refresh(photo)
-    return _build_photo_response(photo)
+    return _build_photo_response(photo, user.id, session)
 
 
 @router.get("/", response_model=PhotoListResponse)
@@ -235,7 +259,7 @@ async def list_photos(
 
     return PhotoListResponse(
         month=month,
-        photos=[_build_photo_response(p) for p in visible],
+        photos=[_build_photo_response(p, user.id, session) for p in visible],
         total=len(visible),
     )
 
@@ -259,16 +283,20 @@ async def update_visibility(
     session.add(photo)
     session.commit()
     session.refresh(photo)
-    return _build_photo_response(photo)
+    return _build_photo_response(photo, user.id, session)
 
 
 @router.get("/{photo_id}", response_model=PhotoResponse)
-async def get_photo(photo_id: str, session: Session = Depends(get_session)):
+async def get_photo(
+    photo_id: str,
+    user: User = Depends(get_current_user),
+    session: Session = Depends(get_session),
+):
     """Get metadata for a single photo."""
     photo = session.get(Photo, photo_id)
     if not photo:
         raise HTTPException(status_code=404, detail="Photo not found")
-    return _build_photo_response(photo)
+    return _build_photo_response(photo, user.id, session)
 
 
 @router.get("/{photo_id}/file")
