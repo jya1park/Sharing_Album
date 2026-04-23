@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 
 import '../models/photo.dart';
 import '../services/api_service.dart';
+import '../services/auth_service.dart';
 import '../utils/media_helper.dart';
+import '../utils/visibility_dialog.dart';
 import '../widgets/photo_grid.dart';
 
 const _gradientDecoration = BoxDecoration(
@@ -109,6 +111,13 @@ class FavoritesTabState extends State<FavoritesTab> {
                       onTap: _openPhotoView,
                       onRefresh: _load,
                       showFavoriteIcon: true,
+                      onBatchAction: AuthService.canSetVisibility
+                          ? (selected) => showBatchVisibilityDialog(
+                                context: context,
+                                photos: selected,
+                                onDone: _load,
+                              )
+                          : null,
                     ),
         ),
       ),
