@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:flutter_staggered_grid_view/flutter_staggered_grid_view.dart';
 
 import '../models/photo.dart';
 import '../services/api_service.dart';
@@ -55,6 +56,108 @@ class PhotoGridState extends State<PhotoGrid> {
   Color get _activeColor => Colors.white;
   Color get _inactiveColor => Colors.white54;
 
+  /// Build tile layout: videos get 2x2, photos get 1x1, packed into 4 columns
+  List<StaggeredGridTile> _buildTiles() {
+    final tiles = <StaggeredGridTile>[];
+    for (int i = 0; i < widget.photos.length; i++) {
+      final photo = widget.photos[i];
+      if (photo.isVideo) {
+        tiles.add(StaggeredGridTile.count(
+          crossAxisCellCount: 2,
+          mainAxisCellCount: 2,
+          child: _buildItem(photo, i),
+        ));
+      } else {
+        tiles.add(StaggeredGridTile.count(
+          crossAxisCellCount: 1,
+          mainAxisCellCount: 1,
+          child: _buildItem(photo, i),
+        ));
+      }
+    }
+    return tiles;
+  }
+
+  Widget _buildItem(Photo photo, int index) {
+    final isSelected = _selectedIds.contains(photo.id);
+
+    return GestureDetector(
+      onTap: () {
+        if (_isSelecting) {
+          _toggleSelection(photo);
+        } else {
+          widget.onTap(index);
+        }
+      },
+      onLongPress: () {
+        if (!_isSelecting && widget.onBatchAction != null) {
+          setState(() => _isSelecting = true);
+          _toggleSelection(photo);
+        }
+      },
+      child: Stack(
+        fit: StackFit.expand,
+        children: [
+          CachedNetworkImage(
+            imageUrl: ApiService.imageUrl(photo.thumbnailUrl),
+            fit: BoxFit.cover,
+            placeholder: (context, url) => Container(color: Colors.grey[200]),
+            errorWidget: (context, url, error) => Container(
+              color: Colors.grey[200],
+              child: const Icon(Icons.broken_image, color: Colors.grey, size: 24),
+            ),
+          ),
+          if (photo.isVideo)
+            Center(
+              child: Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: Colors.black.withAlpha(100),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(Icons.play_arrow, color: Colors.white, size: 32),
+              ),
+            ),
+          if (photo.isPrivate)
+            Positioned(
+              left: 4,
+              top: 4,
+              child: Icon(Icons.lock, color: Colors.white.withAlpha(200), size: 14),
+            ),
+          if (widget.showFavoriteIcon || photo.isFavorite)
+            const Positioned(
+              right: 4,
+              bottom: 4,
+              child: Icon(Icons.favorite, color: Colors.redAccent, size: 16),
+            ),
+          if (_isSelecting)
+            Container(
+              color: isSelected
+                  ? const Color(0xFF7C4DFF).withAlpha(80)
+                  : Colors.transparent,
+            ),
+          if (_isSelecting)
+            Positioned(
+              right: 6,
+              top: 6,
+              child: Container(
+                width: 24,
+                height: 24,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: isSelected ? const Color(0xFF7C4DFF) : Colors.white.withAlpha(200),
+                  border: Border.all(color: Colors.white, width: 2),
+                ),
+                child: isSelected
+                    ? const Icon(Icons.check, color: Colors.white, size: 16)
+                    : null,
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Column(
@@ -106,94 +209,15 @@ class PhotoGridState extends State<PhotoGrid> {
         Expanded(
           child: RefreshIndicator(
             onRefresh: widget.onRefresh,
-            child: GridView.builder(
+            child: SingleChildScrollView(
+              physics: const AlwaysScrollableScrollPhysics(),
               padding: const EdgeInsets.all(4),
-              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                crossAxisCount: 3,
+              child: StaggeredGrid.count(
+                crossAxisCount: 4,
                 crossAxisSpacing: 4,
                 mainAxisSpacing: 4,
+                children: _buildTiles(),
               ),
-              itemCount: widget.photos.length,
-              itemBuilder: (context, index) {
-                final photo = widget.photos[index];
-                final isSelected = _selectedIds.contains(photo.id);
-
-                return GestureDetector(
-                  onTap: () {
-                    if (_isSelecting) {
-                      _toggleSelection(photo);
-                    } else {
-                      widget.onTap(index);
-                    }
-                  },
-                  onLongPress: () {
-                    if (!_isSelecting && widget.onBatchAction != null) {
-                      setState(() => _isSelecting = true);
-                      _toggleSelection(photo);
-                    }
-                  },
-                  child: Stack(
-                    fit: StackFit.expand,
-                    children: [
-                      CachedNetworkImage(
-                        imageUrl: ApiService.imageUrl(photo.thumbnailUrl),
-                        fit: BoxFit.cover,
-                        placeholder: (context, url) => Container(color: Colors.grey[200]),
-                        errorWidget: (context, url, error) => Container(
-                          color: Colors.grey[200],
-                          child: const Icon(Icons.broken_image, color: Colors.grey, size: 24),
-                        ),
-                      ),
-                      if (photo.isVideo)
-                        Center(
-                          child: Container(
-                            padding: const EdgeInsets.all(6),
-                            decoration: BoxDecoration(
-                              color: Colors.black.withAlpha(100),
-                              shape: BoxShape.circle,
-                            ),
-                            child: const Icon(Icons.play_arrow, color: Colors.white, size: 24),
-                          ),
-                        ),
-                      if (photo.isPrivate)
-                        Positioned(
-                          left: 4,
-                          top: 4,
-                          child: Icon(Icons.lock, color: Colors.white.withAlpha(200), size: 14),
-                        ),
-                      if (widget.showFavoriteIcon || photo.isFavorite)
-                        const Positioned(
-                          right: 4,
-                          bottom: 4,
-                          child: Icon(Icons.favorite, color: Colors.redAccent, size: 16),
-                        ),
-                      if (_isSelecting)
-                        Container(
-                          color: isSelected
-                              ? const Color(0xFF7C4DFF).withAlpha(80)
-                              : Colors.transparent,
-                        ),
-                      if (_isSelecting)
-                        Positioned(
-                          right: 6,
-                          top: 6,
-                          child: Container(
-                            width: 24,
-                            height: 24,
-                            decoration: BoxDecoration(
-                              shape: BoxShape.circle,
-                              color: isSelected ? const Color(0xFF7C4DFF) : Colors.white.withAlpha(200),
-                              border: Border.all(color: Colors.white, width: 2),
-                            ),
-                            child: isSelected
-                                ? const Icon(Icons.check, color: Colors.white, size: 16)
-                                : null,
-                          ),
-                        ),
-                    ],
-                  ),
-                );
-              },
             ),
           ),
         ),
@@ -204,9 +228,7 @@ class PhotoGridState extends State<PhotoGrid> {
   Widget _actionButton(IconData icon, String label, String action) {
     return InkWell(
       onTap: _hasSelection
-          ? () {
-              widget.onBatchAction?.call(selectedPhotos, action);
-            }
+          ? () => widget.onBatchAction?.call(selectedPhotos, action)
           : null,
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
