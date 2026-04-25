@@ -51,83 +51,129 @@ class PhotoGridState extends State<PhotoGrid> {
 
   bool get _hasSelection => _selectedIds.isNotEmpty;
 
-  /// Build rows: 3 columns, videos take full row, photos fill 1~3 per row
+  int _idx(Photo p) => widget.photos.indexOf(p);
+
+  /// 3-column layout:
+  /// - Photos only: 3 per row
+  /// - Video (2x2) + 1 photo top + 1 photo bottom, video position alternates
   List<Widget> _buildRows() {
     final rows = <Widget>[];
     int i = 0;
-    int photoPattern = 0;
+    int videoPosition = 0; // 0=left, 1=right
 
     while (i < widget.photos.length) {
       final photo = widget.photos[i];
 
       if (photo.isVideo) {
-        // Video: full width row
-        rows.add(Padding(
-          padding: const EdgeInsets.all(2),
-          child: AspectRatio(
-            aspectRatio: 16 / 9,
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(4),
-              child: _buildItem(photo, i),
-            ),
-          ),
-        ));
-        i++;
+        // Collect up to 2 photos to fill beside the video
+        final sidePhotos = <Photo>[];
+        int j = i + 1;
+        while (sidePhotos.length < 2 && j < widget.photos.length) {
+          if (!widget.photos[j].isVideo) {
+            sidePhotos.add(widget.photos[j]);
+          }
+          j++;
+        }
+
+        final bool videoLeft = videoPosition % 2 == 0;
+        videoPosition++;
+
+        rows.add(_buildVideoBlock(photo, sidePhotos, videoLeft));
+        i = j;
       } else {
-        // Collect consecutive photos
-        final batch = <Photo>[];
-        final batchIndices = <int>[];
-        while (i < widget.photos.length && !widget.photos[i].isVideo && batch.length < 6) {
-          batch.add(widget.photos[i]);
-          batchIndices.add(i);
+        // Collect up to 3 consecutive photos
+        final rowPhotos = <Photo>[];
+        while (rowPhotos.length < 3 && i < widget.photos.length && !widget.photos[i].isVideo) {
+          rowPhotos.add(widget.photos[i]);
           i++;
         }
 
-        // Lay out photos in rows with varying patterns: 3, 2, 1
-        int j = 0;
-        while (j < batch.length) {
-          final remaining = batch.length - j;
-          int count;
-
-          if (remaining >= 3) {
-            // Alternate patterns: 3, 2+1, 1+2
-            final patterns = [3, 3, 2];
-            count = patterns[photoPattern % patterns.length];
-            if (count > remaining) count = remaining;
-            photoPattern++;
-          } else {
-            count = remaining;
-          }
-
-          final rowPhotos = batch.sublist(j, j + count);
-          final rowIndices = batchIndices.sublist(j, j + count);
-
-          rows.add(Row(
-            children: [
-              for (int k = 0; k < rowPhotos.length; k++)
-                Expanded(
-                  child: AspectRatio(
-                    aspectRatio: 1,
-                    child: Padding(
-                      padding: const EdgeInsets.all(2),
-                      child: ClipRRect(
-                        borderRadius: BorderRadius.circular(4),
-                        child: _buildItem(rowPhotos[k], rowIndices[k]),
-                      ),
-                    ),
-                  ),
-                ),
-              // Fill empty cells to keep alignment
-              for (int k = rowPhotos.length; k < 3; k++)
-                const Expanded(child: SizedBox()),
-            ],
-          ));
-
-          j += count;
-        }
+        rows.add(_buildPhotoRow(rowPhotos));
       }
     }
     return rows;
+  }
+
+  /// 3 photos in a row (or fewer, padded with empty space)
+  Widget _buildPhotoRow(List<Photo> photos) {
+    return Row(
+      children: [
+        for (final p in photos)
+          Expanded(
+            child: AspectRatio(
+              aspectRatio: 1,
+              child: Padding(
+                padding: const EdgeInsets.all(2),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(4),
+                  child: _buildItem(p, _idx(p)),
+                ),
+              ),
+            ),
+          ),
+        for (int k = photos.length; k < 3; k++)
+          const Expanded(child: SizedBox()),
+      ],
+    );
+  }
+
+  /// Video 2x2 block with 1 photo on top and 1 on bottom in the remaining column
+  Widget _buildVideoBlock(Photo video, List<Photo> sidePhotos, bool videoLeft) {
+    final videoWidget = Expanded(
+      flex: 2,
+      child: AspectRatio(
+        aspectRatio: 1,
+        child: Padding(
+          padding: const EdgeInsets.all(2),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(4),
+            child: _buildItem(video, _idx(video)),
+          ),
+        ),
+      ),
+    );
+
+    final top = sidePhotos.isNotEmpty
+        ? _buildItem(sidePhotos[0], _idx(sidePhotos[0]))
+        : const SizedBox();
+    final bottom = sidePhotos.length > 1
+        ? _buildItem(sidePhotos[1], _idx(sidePhotos[1]))
+        : const SizedBox();
+
+    final sideColumn = Expanded(
+      flex: 1,
+      child: Column(
+        children: [
+          AspectRatio(
+            aspectRatio: 1,
+            child: Padding(
+              padding: const EdgeInsets.all(2),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(4),
+                child: top,
+              ),
+            ),
+          ),
+          AspectRatio(
+            aspectRatio: 1,
+            child: Padding(
+              padding: const EdgeInsets.all(2),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(4),
+                child: bottom,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: videoLeft
+          ? [videoWidget, sideColumn]
+          : [sideColumn, videoWidget],
+    );
   }
 
   Widget _buildItem(Photo photo, int index) {
