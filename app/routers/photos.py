@@ -7,7 +7,7 @@ from datetime import datetime, timezone, timedelta
 from pathlib import Path
 
 from fastapi import APIRouter, Depends, Form, HTTPException, Query, UploadFile, File, status
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, RedirectResponse
 from PIL import Image
 from sqlmodel import Session, select
 
@@ -24,6 +24,7 @@ from app.schemas import PhotoResponse, PhotoListResponse, MonthListResponse, Mes
 from app.utils.exif import extract_taken_date
 from app.utils.image import compress_and_resize, generate_thumbnail
 from app.utils.video import generate_video_thumbnail
+from app.utils.storage import save_original, get_original_url, get_original_path, delete_original
 
 router = APIRouter()
 
@@ -138,16 +139,16 @@ async def upload_photo(
         original_path = original_dir / stored_name
         thumbnail_path = thumbnail_dir / thumb_name
 
+        original_key = f"{month_folder}/original/{stored_name}"
+        thumb_key = f"{month_folder}/thumbnails/{thumb_name}"
+
         if is_video:
-            # Save video as-is
-            original_dir.mkdir(parents=True, exist_ok=True)
-            shutil.copy2(str(tmp_path), str(original_path))
             file_size = file_size_raw
-            # Generate thumbnail from first frame
+            save_original(tmp_path, original_key)
             generate_video_thumbnail(tmp_path, thumbnail_path)
         else:
-            # Resize/compress photo
             file_size = compress_and_resize(tmp_path, original_path)
+            save_original(original_path, original_key)
             generate_thumbnail(original_path, thumbnail_path)
 
     finally:
@@ -312,20 +313,25 @@ async def get_photo_file(
 
     if type == "thumbnail":
         file_path = PHOTOS_DIR / photo.thumbnail_path
-        media_type = "image/jpeg"
-    else:
-        file_path = PHOTOS_DIR / photo.file_path
-        media_type = mimetypes.guess_type(str(file_path))[0] or "application/octet-stream"
-        # Note: download permission checked on client side
+        if not file_path.exists():
+            raise HTTPException(status_code=404, detail="Thumbnail not found")
+        return FileResponse(path=str(file_path), media_type="image/jpeg")
 
-    if not file_path.exists():
-        raise HTTPException(status_code=404, detail="File not found on disk")
+    # Original file
+    signed_url = get_original_url(photo.file_path)
+    if signed_url:
+        return RedirectResponse(url=signed_url)
 
-    return FileResponse(
-        path=str(file_path),
-        media_type=media_type,
-        filename=photo.original_filename if type == "original" else None,
-    )
+    local_path = get_original_path(photo.file_path)
+    if local_path and local_path.exists():
+        media_type = mimetypes.guess_type(str(local_path))[0] or "application/octet-stream"
+        return FileResponse(
+            path=str(local_path),
+            media_type=media_type,
+            filename=photo.original_filename,
+        )
+
+    raise HTTPException(status_code=404, detail="File not found")
 
 
 @router.delete("/{photo_id}", response_model=MessageResponse)
@@ -344,11 +350,11 @@ async def delete_photo(
     if user.role != "admin" and not (is_owner and user.can_delete):
         raise HTTPException(status_code=403, detail="Delete permission denied")
 
-    original_file = PHOTOS_DIR / photo.file_path
+    try:
+        delete_original(photo.file_path)
+    except Exception:
+        pass
     thumbnail_file = PHOTOS_DIR / photo.thumbnail_path
-
-    if original_file.exists():
-        original_file.unlink()
     if thumbnail_file.exists():
         thumbnail_file.unlink()
 
