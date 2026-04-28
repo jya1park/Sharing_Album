@@ -97,15 +97,9 @@ class PhotoGridState extends State<PhotoGrid> {
         videoPosition++;
         rows.add(_buildVideoBlock(video, sidePhotos, videoLeft));
       } else {
-        // Collect up to 3 photos
+        // Collect exactly 3 photos (ignore video ordering for row fill)
         final rowPhotos = <Photo>[];
         while (rowPhotos.length < 3 && pi < photoQueue.length) {
-          // Check if next in original order is a video
-          if (vi < videoQueue.length) {
-            final nextVidIdx = widget.photos.indexOf(videoQueue[vi]);
-            final nextPhotoIdx = widget.photos.indexOf(photoQueue[pi]);
-            if (nextVidIdx < nextPhotoIdx) break;
-          }
           rowPhotos.add(photoQueue[pi++]);
         }
         if (rowPhotos.isNotEmpty) {
