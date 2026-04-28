@@ -65,13 +65,11 @@ class PhotoGridState extends State<PhotoGrid> {
       final photo = widget.photos[i];
 
       if (photo.isVideo) {
-        // Collect up to 2 photos to fill beside the video
+        // Collect up to 2 photos immediately after this video (stop at next video)
         final sidePhotos = <Photo>[];
         int j = i + 1;
-        while (sidePhotos.length < 2 && j < widget.photos.length) {
-          if (!widget.photos[j].isVideo) {
-            sidePhotos.add(widget.photos[j]);
-          }
+        while (sidePhotos.length < 2 && j < widget.photos.length && !widget.photos[j].isVideo) {
+          sidePhotos.add(widget.photos[j]);
           j++;
         }
 

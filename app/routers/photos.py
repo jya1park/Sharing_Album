@@ -253,7 +253,7 @@ async def list_photos(
     statement = (
         select(Photo)
         .where(Photo.month_folder == month)
-        .order_by(Photo.taken_at.desc(), Photo.uploaded_at.desc())
+        .order_by(Photo.uploaded_at.desc())
     )
     photos = session.exec(statement).all()
     visible = _filter_visible(photos, user.id)
