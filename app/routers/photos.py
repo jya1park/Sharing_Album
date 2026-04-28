@@ -7,7 +7,7 @@ from datetime import datetime, timezone, timedelta
 from pathlib import Path
 
 from fastapi import APIRouter, Depends, Form, HTTPException, Query, UploadFile, File, status
-from fastapi.responses import FileResponse, RedirectResponse
+from fastapi.responses import FileResponse
 from PIL import Image
 from sqlmodel import Session, select
 
@@ -24,7 +24,7 @@ from app.schemas import PhotoResponse, PhotoListResponse, MonthListResponse, Mes
 from app.utils.exif import extract_taken_date
 from app.utils.image import compress_and_resize, generate_thumbnail
 from app.utils.video import generate_video_thumbnail
-from app.utils.storage import save_original, get_original_url, get_original_path, delete_original
+from app.utils.storage import save_original, download_original, get_original_path, delete_original
 
 router = APIRouter()
 
@@ -317,16 +317,22 @@ async def get_photo_file(
             raise HTTPException(status_code=404, detail="Thumbnail not found")
         return FileResponse(path=str(file_path), media_type="image/jpeg")
 
-    # Original file
-    signed_url = get_original_url(photo.file_path)
-    if signed_url:
-        return RedirectResponse(url=signed_url)
-
+    # Original file - try local first, then GCS
     local_path = get_original_path(photo.file_path)
-    if local_path and local_path.exists():
+    if local_path:
         media_type = mimetypes.guess_type(str(local_path))[0] or "application/octet-stream"
         return FileResponse(
             path=str(local_path),
+            media_type=media_type,
+            filename=photo.original_filename,
+        )
+
+    # Download from GCS to temp file and serve
+    tmp_path = download_original(photo.file_path)
+    if tmp_path:
+        media_type = mimetypes.guess_type(str(tmp_path))[0] or "application/octet-stream"
+        return FileResponse(
+            path=str(tmp_path),
             media_type=media_type,
             filename=photo.original_filename,
         )

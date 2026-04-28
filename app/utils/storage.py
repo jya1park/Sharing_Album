@@ -1,7 +1,7 @@
 import mimetypes
 import shutil
+import tempfile
 from pathlib import Path
-from datetime import timedelta
 
 from app.config import PHOTOS_DIR, GCS_BUCKET, USE_GCS
 
@@ -32,12 +32,17 @@ def save_original(source_path: Path, dest_key: str) -> None:
             shutil.copy2(str(source_path), str(dest_path))
 
 
-def get_original_url(dest_key: str) -> str | None:
-    """Get a signed URL for the original file (GCS only). Returns None for local."""
+def download_original(dest_key: str) -> Path | None:
+    """Download original file from GCS to a temp file. Returns temp path or None."""
     if USE_GCS:
         bucket = _get_bucket()
         blob = bucket.blob(dest_key)
-        return blob.generate_signed_url(expiration=timedelta(hours=1))
+        if not blob.exists():
+            return None
+        ext = dest_key.rsplit(".", 1)[-1] if "." in dest_key else "bin"
+        tmp = tempfile.NamedTemporaryFile(delete=False, suffix=f".{ext}")
+        blob.download_to_filename(tmp.name)
+        return Path(tmp.name)
     return None
 
 
@@ -45,7 +50,8 @@ def get_original_path(dest_key: str) -> Path | None:
     """Get local path for original file. Returns None if using GCS."""
     if USE_GCS:
         return None
-    return PHOTOS_DIR / dest_key
+    path = PHOTOS_DIR / dest_key
+    return path if path.exists() else None
 
 
 def delete_original(dest_key: str) -> None:
@@ -58,10 +64,3 @@ def delete_original(dest_key: str) -> None:
         file_path = PHOTOS_DIR / dest_key
         if file_path.exists():
             file_path.unlink()
-
-
-def save_thumbnail(source_path: Path, dest_key: str) -> None:
-    """Thumbnails always saved locally for fast serving."""
-    dest_path = PHOTOS_DIR / dest_key
-    dest_path.parent.mkdir(parents=True, exist_ok=True)
-    shutil.copy2(str(source_path), str(dest_path))
