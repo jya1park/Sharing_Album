@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../models/photo.dart';
 import '../services/api_service.dart';
+import '../utils/batch_actions.dart';
 import '../utils/media_helper.dart';
 import '../widgets/photo_grid.dart';
 
@@ -109,6 +110,11 @@ class FavoritesTabState extends State<FavoritesTab> {
                       onTap: _openPhotoView,
                       onRefresh: _load,
                       showFavoriteIcon: true,
+                      onBatchAction: (selected, action) =>
+                          handleBatchAction(context, selected, action, () {
+                            _load();
+                            widget.onFavoriteChanged();
+                          }),
                     ),
         ),
       ),

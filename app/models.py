@@ -43,3 +43,9 @@ class Photo(SQLModel, table=True):
 
     album_id: Optional[str] = Field(default=None, index=True)
     uploader_id: Optional[str] = Field(default=None, index=True)
+
+
+class UserFavorite(SQLModel, table=True):
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()), primary_key=True)
+    user_id: str = Field(index=True)
+    photo_id: str = Field(index=True)

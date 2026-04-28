@@ -186,6 +186,18 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
           overflow: TextOverflow.ellipsis,
         ),
         actions: [
+          if (AuthService.canDelete || AuthService.isAdmin)
+            IconButton(
+              icon: const Icon(Icons.delete_outline),
+              onPressed: _showDeleteDialog,
+            ),
+          IconButton(
+            icon: Icon(
+              _photo.isFavorite ? Icons.favorite : Icons.favorite_border,
+              color: _photo.isFavorite ? Colors.redAccent : Colors.white,
+            ),
+            onPressed: _toggleFavorite,
+          ),
           if (AuthService.canDownload)
             IconButton(
               icon: _isDownloading
@@ -195,18 +207,6 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
                     )
                   : const Icon(Icons.download),
               onPressed: _isDownloading ? null : _downloadVideo,
-            ),
-          IconButton(
-            icon: Icon(
-              _photo.isFavorite ? Icons.favorite : Icons.favorite_border,
-              color: _photo.isFavorite ? Colors.redAccent : Colors.white,
-            ),
-            onPressed: _toggleFavorite,
-          ),
-          if (AuthService.canDelete || AuthService.isAdmin)
-            IconButton(
-              icon: const Icon(Icons.delete_outline),
-              onPressed: _showDeleteDialog,
             ),
         ],
       ),

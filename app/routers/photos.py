@@ -7,7 +7,7 @@ from datetime import datetime, timezone, timedelta
 from pathlib import Path
 
 from fastapi import APIRouter, Depends, Form, HTTPException, Query, UploadFile, File, status
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, RedirectResponse
 from PIL import Image
 from sqlmodel import Session, select
 
@@ -19,17 +19,25 @@ from app.config import (
 )
 from app.auth import get_current_user
 from app.database import get_session
-from app.models import Photo, User
+from app.models import Photo, User, UserFavorite
 from app.schemas import PhotoResponse, PhotoListResponse, MonthListResponse, MessageResponse
 from app.utils.exif import extract_taken_date
 from app.utils.image import compress_and_resize, generate_thumbnail
 from app.utils.video import generate_video_thumbnail
+from app.utils.storage import save_original, get_original_url, get_original_path, delete_original
 
 router = APIRouter()
 
 
-def _build_photo_response(photo: Photo) -> PhotoResponse:
+def _build_photo_response(photo: Photo, user_id: str = "", session: Session = None) -> PhotoResponse:
     visible_list = photo.visible_to.split(",") if photo.visible_to else None
+    is_fav = False
+    if session and user_id:
+        fav = session.exec(
+            select(UserFavorite)
+            .where(UserFavorite.user_id == user_id, UserFavorite.photo_id == photo.id)
+        ).first()
+        is_fav = fav is not None
     return PhotoResponse(
         id=photo.id,
         original_filename=photo.original_filename,
@@ -40,7 +48,7 @@ def _build_photo_response(photo: Photo) -> PhotoResponse:
         uploaded_at=photo.uploaded_at,
         month_folder=photo.month_folder,
         media_type=photo.media_type,
-        is_favorite=photo.is_favorite,
+        is_favorite=is_fav,
         uploader_name=photo.uploader_name,
         visible_to=visible_list,
     )
@@ -131,16 +139,16 @@ async def upload_photo(
         original_path = original_dir / stored_name
         thumbnail_path = thumbnail_dir / thumb_name
 
+        original_key = f"{month_folder}/original/{stored_name}"
+        thumb_key = f"{month_folder}/thumbnails/{thumb_name}"
+
         if is_video:
-            # Save video as-is
-            original_dir.mkdir(parents=True, exist_ok=True)
-            shutil.copy2(str(tmp_path), str(original_path))
             file_size = file_size_raw
-            # Generate thumbnail from first frame
+            save_original(tmp_path, original_key)
             generate_video_thumbnail(tmp_path, thumbnail_path)
         else:
-            # Resize/compress photo
             file_size = compress_and_resize(tmp_path, original_path)
+            save_original(original_path, original_key)
             generate_thumbnail(original_path, thumbnail_path)
 
     finally:
@@ -165,7 +173,7 @@ async def upload_photo(
     session.commit()
     session.refresh(photo)
 
-    return _build_photo_response(photo)
+    return _build_photo_response(photo, user.id, session)
 
 
 @router.get("/months", response_model=MonthListResponse)
@@ -186,7 +194,7 @@ async def list_recent(
     statement = select(Photo).order_by(Photo.uploaded_at.desc()).limit(limit * 2)
     photos = session.exec(statement).all()
     visible = _filter_visible(photos, user.id)
-    return [_build_photo_response(p) for p in visible[:limit]]
+    return [_build_photo_response(p, user.id, session) for p in visible[:limit]]
 
 
 @router.get("/favorites", response_model=list[PhotoResponse])
@@ -194,28 +202,45 @@ async def list_favorites(
     user: User = Depends(get_current_user),
     session: Session = Depends(get_session),
 ):
-    """Get all favorited photos, sorted by most recently favorited first."""
+    """Get current user's favorited photos."""
+    fav_ids = session.exec(
+        select(UserFavorite.photo_id).where(UserFavorite.user_id == user.id)
+    ).all()
+    if not fav_ids:
+        return []
     statement = (
         select(Photo)
-        .where(Photo.is_favorite == True)
+        .where(Photo.id.in_(fav_ids))
         .order_by(Photo.uploaded_at.desc())
     )
     photos = session.exec(statement).all()
     visible = _filter_visible(photos, user.id)
-    return [_build_photo_response(p) for p in visible]
+    return [_build_photo_response(p, user.id, session) for p in visible]
 
 
 @router.put("/{photo_id}/favorite", response_model=PhotoResponse)
-async def toggle_favorite(photo_id: str, session: Session = Depends(get_session)):
-    """Toggle favorite status of a photo."""
+async def toggle_favorite(
+    photo_id: str,
+    user: User = Depends(get_current_user),
+    session: Session = Depends(get_session),
+):
+    """Toggle favorite status for current user."""
     photo = session.get(Photo, photo_id)
     if not photo:
         raise HTTPException(status_code=404, detail="Photo not found")
-    photo.is_favorite = not photo.is_favorite
-    session.add(photo)
+
+    existing = session.exec(
+        select(UserFavorite)
+        .where(UserFavorite.user_id == user.id, UserFavorite.photo_id == photo_id)
+    ).first()
+
+    if existing:
+        session.delete(existing)
+    else:
+        session.add(UserFavorite(user_id=user.id, photo_id=photo_id))
+
     session.commit()
-    session.refresh(photo)
-    return _build_photo_response(photo)
+    return _build_photo_response(photo, user.id, session)
 
 
 @router.get("/", response_model=PhotoListResponse)
@@ -228,14 +253,14 @@ async def list_photos(
     statement = (
         select(Photo)
         .where(Photo.month_folder == month)
-        .order_by(Photo.taken_at.desc(), Photo.uploaded_at.desc())
+        .order_by(Photo.uploaded_at.desc())
     )
     photos = session.exec(statement).all()
     visible = _filter_visible(photos, user.id)
 
     return PhotoListResponse(
         month=month,
-        photos=[_build_photo_response(p) for p in visible],
+        photos=[_build_photo_response(p, user.id, session) for p in visible],
         total=len(visible),
     )
 
@@ -259,16 +284,20 @@ async def update_visibility(
     session.add(photo)
     session.commit()
     session.refresh(photo)
-    return _build_photo_response(photo)
+    return _build_photo_response(photo, user.id, session)
 
 
 @router.get("/{photo_id}", response_model=PhotoResponse)
-async def get_photo(photo_id: str, session: Session = Depends(get_session)):
+async def get_photo(
+    photo_id: str,
+    user: User = Depends(get_current_user),
+    session: Session = Depends(get_session),
+):
     """Get metadata for a single photo."""
     photo = session.get(Photo, photo_id)
     if not photo:
         raise HTTPException(status_code=404, detail="Photo not found")
-    return _build_photo_response(photo)
+    return _build_photo_response(photo, user.id, session)
 
 
 @router.get("/{photo_id}/file")
@@ -284,20 +313,25 @@ async def get_photo_file(
 
     if type == "thumbnail":
         file_path = PHOTOS_DIR / photo.thumbnail_path
-        media_type = "image/jpeg"
-    else:
-        file_path = PHOTOS_DIR / photo.file_path
-        media_type = mimetypes.guess_type(str(file_path))[0] or "application/octet-stream"
-        # Note: download permission checked on client side
+        if not file_path.exists():
+            raise HTTPException(status_code=404, detail="Thumbnail not found")
+        return FileResponse(path=str(file_path), media_type="image/jpeg")
 
-    if not file_path.exists():
-        raise HTTPException(status_code=404, detail="File not found on disk")
+    # Original file
+    signed_url = get_original_url(photo.file_path)
+    if signed_url:
+        return RedirectResponse(url=signed_url)
 
-    return FileResponse(
-        path=str(file_path),
-        media_type=media_type,
-        filename=photo.original_filename if type == "original" else None,
-    )
+    local_path = get_original_path(photo.file_path)
+    if local_path and local_path.exists():
+        media_type = mimetypes.guess_type(str(local_path))[0] or "application/octet-stream"
+        return FileResponse(
+            path=str(local_path),
+            media_type=media_type,
+            filename=photo.original_filename,
+        )
+
+    raise HTTPException(status_code=404, detail="File not found")
 
 
 @router.delete("/{photo_id}", response_model=MessageResponse)
@@ -316,11 +350,11 @@ async def delete_photo(
     if user.role != "admin" and not (is_owner and user.can_delete):
         raise HTTPException(status_code=403, detail="Delete permission denied")
 
-    original_file = PHOTOS_DIR / photo.file_path
+    try:
+        delete_original(photo.file_path)
+    except Exception:
+        pass
     thumbnail_file = PHOTOS_DIR / photo.thumbnail_path
-
-    if original_file.exists():
-        original_file.unlink()
     if thumbnail_file.exists():
         thumbnail_file.unlink()
 

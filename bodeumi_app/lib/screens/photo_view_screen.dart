@@ -337,6 +337,26 @@ class _PhotoViewScreenState extends State<PhotoViewScreen> {
         ),
         centerTitle: true,
         actions: [
+          if (AuthService.canSetVisibility)
+            IconButton(
+              icon: Icon(
+                _currentPhoto.isPrivate ? Icons.lock : Icons.lock_open,
+                size: 20,
+              ),
+              onPressed: _showVisibilityDialog,
+          ),
+          if (AuthService.canDelete || AuthService.isAdmin)
+            IconButton(
+              icon: const Icon(Icons.delete_outline),
+              onPressed: _showDeleteDialog,
+            ),
+          IconButton(
+            icon: Icon(
+              _currentPhoto.isFavorite ? Icons.favorite : Icons.favorite_border,
+              color: _currentPhoto.isFavorite ? Colors.redAccent : Colors.white,
+            ),
+            onPressed: _toggleFavorite,
+          ),
           if (AuthService.canDownload)
             IconButton(
               icon: _isDownloading
@@ -352,29 +372,9 @@ class _PhotoViewScreenState extends State<PhotoViewScreen> {
               onPressed: _isDownloading ? null : _downloadPhoto,
             ),
           IconButton(
-            icon: Icon(
-              _currentPhoto.isFavorite ? Icons.favorite : Icons.favorite_border,
-              color: _currentPhoto.isFavorite ? Colors.redAccent : Colors.white,
-            ),
-            onPressed: _toggleFavorite,
-          ),
-          if (AuthService.canSetVisibility)
-            IconButton(
-              icon: Icon(
-                _currentPhoto.isPrivate ? Icons.lock : Icons.lock_open,
-                size: 20,
-              ),
-              onPressed: _showVisibilityDialog,
-          ),
-          IconButton(
             icon: const Icon(Icons.info_outline),
             onPressed: _showInfoSheet,
           ),
-          if (AuthService.canDelete || AuthService.isAdmin)
-            IconButton(
-              icon: const Icon(Icons.delete_outline),
-              onPressed: _showDeleteDialog,
-            ),
         ],
       ),
       body: PhotoViewGallery.builder(

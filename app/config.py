@@ -8,6 +8,10 @@ DATABASE_URL: str = os.getenv("DATABASE_URL", "sqlite:///./bodeumi.db")
 PHOTOS_DIR: Path = Path(os.getenv("PHOTOS_DIR", "./photos"))
 THUMBNAIL_SIZE: tuple[int, int] = (300, 300)
 
+# Google Cloud Storage (optional - if set, originals go to GCS)
+GCS_BUCKET: str = os.getenv("GCS_BUCKET", "")
+USE_GCS: bool = bool(GCS_BUCKET)
+
 # Image processing
 MAX_IMAGE_LONG_SIDE: int = 2048
 IMAGE_QUALITY: int = 85
