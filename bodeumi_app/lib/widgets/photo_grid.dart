@@ -53,40 +53,64 @@ class PhotoGridState extends State<PhotoGrid> {
 
   int _idx(Photo p) => widget.photos.indexOf(p);
 
-  /// 3-column layout:
-  /// - Photos only: 3 per row
-  /// - Video (2x2) + 1 photo top + 1 photo bottom, video position alternates
+  /// Build rows: 3 columns, videos 2x2, photos fill remaining spaces
+  /// Pre-separates photos and videos, then interleaves them
   List<Widget> _buildRows() {
     final rows = <Widget>[];
-    int i = 0;
-    int videoPosition = 0; // 0=left, 1=right
+    final photoQueue = <Photo>[];
+    final videoQueue = <Photo>[];
 
-    while (i < widget.photos.length) {
-      final photo = widget.photos[i];
+    // Separate into queues while maintaining relative order
+    for (final p in widget.photos) {
+      if (p.isVideo) {
+        videoQueue.add(p);
+      } else {
+        photoQueue.add(p);
+      }
+    }
 
-      if (photo.isVideo) {
-        // Collect up to 2 photos immediately after this video (stop at next video)
+    int vi = 0;
+    int pi = 0;
+    int videoPosition = 0;
+
+    // Walk through original list to maintain upload order
+    while (vi < videoQueue.length || pi < photoQueue.length) {
+      // Decide what comes next based on original order
+      bool nextIsVideo = false;
+      if (vi < videoQueue.length && pi < photoQueue.length) {
+        final vidIdx = widget.photos.indexOf(videoQueue[vi]);
+        final photoIdx = widget.photos.indexOf(photoQueue[pi]);
+        nextIsVideo = vidIdx < photoIdx;
+      } else if (vi < videoQueue.length) {
+        nextIsVideo = true;
+      }
+
+      if (nextIsVideo) {
+        final video = videoQueue[vi++];
+        // Grab up to 2 photos from queue for side cells
         final sidePhotos = <Photo>[];
-        int j = i + 1;
-        while (sidePhotos.length < 2 && j < widget.photos.length && !widget.photos[j].isVideo) {
-          sidePhotos.add(widget.photos[j]);
-          j++;
+        while (sidePhotos.length < 2 && pi < photoQueue.length) {
+          sidePhotos.add(photoQueue[pi++]);
         }
 
         final bool videoLeft = videoPosition % 2 == 0;
         videoPosition++;
-
-        rows.add(_buildVideoBlock(photo, sidePhotos, videoLeft));
-        i = j;
+        rows.add(_buildVideoBlock(video, sidePhotos, videoLeft));
       } else {
-        // Collect up to 3 consecutive photos
+        // Collect up to 3 photos
         final rowPhotos = <Photo>[];
-        while (rowPhotos.length < 3 && i < widget.photos.length && !widget.photos[i].isVideo) {
-          rowPhotos.add(widget.photos[i]);
-          i++;
+        while (rowPhotos.length < 3 && pi < photoQueue.length) {
+          // Check if next in original order is a video
+          if (vi < videoQueue.length) {
+            final nextVidIdx = widget.photos.indexOf(videoQueue[vi]);
+            final nextPhotoIdx = widget.photos.indexOf(photoQueue[pi]);
+            if (nextVidIdx < nextPhotoIdx) break;
+          }
+          rowPhotos.add(photoQueue[pi++]);
         }
-
-        rows.add(_buildPhotoRow(rowPhotos));
+        if (rowPhotos.isNotEmpty) {
+          rows.add(_buildPhotoRow(rowPhotos));
+        }
       }
     }
     return rows;
