@@ -351,7 +351,8 @@ async def delete_photo(
     if not photo:
         raise HTTPException(status_code=404, detail="Photo not found")
 
-    if user.role != "admin" and not user.can_delete:
+    is_owner = photo.uploader_id == user.id
+    if not is_owner and user.role != "admin" and not user.can_delete:
         raise HTTPException(status_code=403, detail="Delete permission denied")
 
     try:
