@@ -73,7 +73,11 @@ class GalleryTabState extends State<GalleryTab> {
       });
 
       if (months.isNotEmpty) {
-        _pageController.jumpToPage(newPage);
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (_pageController.hasClients) {
+            _pageController.jumpToPage(newPage);
+          }
+        });
         _loadPhotosForPage(newPage);
       }
     } catch (e) {
@@ -202,17 +206,18 @@ class GalleryTabState extends State<GalleryTab> {
                   : Column(
                       children: [
                         // Year label
-                        Padding(
-                          padding: const EdgeInsets.only(top: 4),
-                          child: Text(
-                            _formatYear(_months[_currentPage]),
-                            style: TextStyle(
-                              fontSize: 14,
-                              color: Colors.grey[600],
-                              fontWeight: FontWeight.w500,
+                        if (_currentPage < _months.length)
+                          Padding(
+                            padding: const EdgeInsets.only(top: 4),
+                            child: Text(
+                              _formatYear(_months[_currentPage]),
+                              style: TextStyle(
+                                fontSize: 14,
+                                color: Colors.grey[600],
+                                fontWeight: FontWeight.w500,
+                              ),
                             ),
                           ),
-                        ),
 
                         // 5-month tab navigation
                         Padding(
@@ -287,6 +292,7 @@ class GalleryTabState extends State<GalleryTab> {
                             controller: _pageController,
                             itemCount: _months.length,
                             onPageChanged: (index) {
+                              if (index >= _months.length) return;
                               setState(() => _currentPage = index);
                               _loadPhotosForPage(index);
                               _loadPhotosForPage(index - 1);
