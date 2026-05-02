@@ -153,7 +153,17 @@ class _PhotoViewScreenState extends State<PhotoViewScreen> {
               try {
                 await widget.onDelete(_currentPhoto);
                 if (mounted) {
-                  navigator.pop(); // go back to grid
+                  if (_photos.length <= 1) {
+                    navigator.pop(); // last photo, go back to grid
+                  } else {
+                    setState(() {
+                      _photos.removeAt(_currentIndex);
+                      if (_currentIndex >= _photos.length) {
+                        _currentIndex = _photos.length - 1;
+                      }
+                      _pageController.jumpToPage(_currentIndex);
+                    });
+                  }
                   messenger.showSnackBar(
                     const SnackBar(
                       content: Text('삭제 완료'),
