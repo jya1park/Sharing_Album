@@ -49,19 +49,32 @@ class GalleryTabState extends State<GalleryTab> {
 
   void reload() {
     _photoCache.clear();
-    _loadMonths();
+    _loadMonths(preservePage: true);
   }
 
-  Future<void> _loadMonths() async {
+  Future<void> _loadMonths({bool preservePage = false}) async {
+    final previousMonth = (_months.isNotEmpty && _currentPage < _months.length)
+        ? _months[_currentPage]
+        : null;
+
     setState(() => _isLoading = true);
     try {
       final months = await ApiService.getMonths();
+      int newPage = 0;
+      if (preservePage && previousMonth != null) {
+        final idx = months.indexOf(previousMonth);
+        newPage = idx >= 0 ? idx : 0;
+      }
+
       setState(() {
         _months = months;
+        _currentPage = newPage;
         _isLoading = false;
       });
+
       if (months.isNotEmpty) {
-        _loadPhotosForPage(0);
+        _pageController.jumpToPage(newPage);
+        _loadPhotosForPage(newPage);
       }
     } catch (e) {
       setState(() => _isLoading = false);
