@@ -25,12 +25,17 @@ Future<void> openMedia({
       ),
     );
   } else {
+    final photoOnly = photos.where((p) => !p.isVideo).toList();
+    int photoIndex = photoOnly.indexWhere((p) => p.id == photo.id);
+    if (photoIndex < 0) photoIndex = 0;
+    if (photoOnly.isEmpty) return Future.value();
+
     return Navigator.push(
       context,
       MaterialPageRoute(
         builder: (context) => PhotoViewScreen(
-          photos: photos.where((p) => !p.isVideo).toList(),
-          initialIndex: photos.where((p) => !p.isVideo).toList().indexWhere((p) => p.id == photo.id).clamp(0, photos.length),
+          photos: photoOnly,
+          initialIndex: photoIndex,
           onDelete: onDelete,
           onFavoriteToggle: onFavoriteToggle,
         ),
