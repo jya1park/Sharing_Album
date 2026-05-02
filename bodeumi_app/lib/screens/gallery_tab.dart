@@ -148,14 +148,13 @@ class GalleryTabState extends State<GalleryTab> {
       index: index,
       onDelete: (photo) async {
         await ApiService.deletePhoto(photo.id);
-        reload();
       },
       onFavoriteToggle: (photo) async {
         final updated = await ApiService.toggleFavorite(photo.id);
         widget.onFavoriteChanged();
         return updated;
       },
-    );
+    ).then((_) => reload());
   }
 
   @override

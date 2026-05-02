@@ -4,7 +4,7 @@ import '../models/photo.dart';
 import '../screens/photo_view_screen.dart';
 import '../screens/video_player_screen.dart';
 
-void openMedia({
+Future<void> openMedia({
   required BuildContext context,
   required List<Photo> photos,
   required int index,
@@ -14,7 +14,7 @@ void openMedia({
   final photo = photos[index];
 
   if (photo.isVideo) {
-    Navigator.push(
+    return Navigator.push(
       context,
       MaterialPageRoute(
         builder: (context) => VideoPlayerScreen(
@@ -25,7 +25,7 @@ void openMedia({
       ),
     );
   } else {
-    Navigator.push(
+    return Navigator.push(
       context,
       MaterialPageRoute(
         builder: (context) => PhotoViewScreen(

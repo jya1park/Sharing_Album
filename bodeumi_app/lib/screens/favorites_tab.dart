@@ -59,14 +59,13 @@ class FavoritesTabState extends State<FavoritesTab> {
       onDelete: (photo) async {
         await ApiService.deletePhoto(photo.id);
         widget.onFavoriteChanged();
-        reload();
       },
       onFavoriteToggle: (photo) async {
         final updated = await ApiService.toggleFavorite(photo.id);
         widget.onFavoriteChanged();
         return updated;
       },
-    );
+    ).then((_) => _load());
   }
 
   @override
