@@ -170,9 +170,9 @@ class _MembersScreenState extends State<MembersScreen> {
 
                           return Card(
                             elevation: 0,
-                            color: Colors.white.withAlpha(180),
+                            color: Colors.white.withAlpha(200),
                             shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12),
+                              borderRadius: BorderRadius.circular(16),
                             ),
                             child: ListTile(
                               leading: CircleAvatar(
@@ -201,7 +201,7 @@ class _MembersScreenState extends State<MembersScreen> {
                                       padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                                       decoration: BoxDecoration(
                                         color: const Color(0xFFFF9800),
-                                        borderRadius: BorderRadius.circular(8),
+                                        borderRadius: BorderRadius.circular(10),
                                       ),
                                       child: const Text(
                                         '관리자',
@@ -214,7 +214,7 @@ class _MembersScreenState extends State<MembersScreen> {
                                       padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                                       decoration: BoxDecoration(
                                         color: const Color(0xFF7C4DFF),
-                                        borderRadius: BorderRadius.circular(8),
+                                        borderRadius: BorderRadius.circular(10),
                                       ),
                                       child: const Text(
                                         '나',

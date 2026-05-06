@@ -206,8 +206,8 @@ class _UploadGroupCard extends StatelessWidget {
     return Card(
       margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
       elevation: 0,
-      color: Colors.white.withAlpha(180),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      color: Colors.white.withAlpha(200),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -217,7 +217,7 @@ class _UploadGroupCard extends StatelessWidget {
             child: Row(
               children: [
                 CircleAvatar(
-                  radius: 18,
+                  radius: 20,
                   backgroundColor: const Color(0xFFE1BEE7),
                   child: Text(
                     name.characters.first,
@@ -273,7 +273,7 @@ class _UploadGroupCard extends StatelessWidget {
                     return GestureDetector(
                       onTap: () => onPhotoTap(photo),
                       child: ClipRRect(
-                        borderRadius: BorderRadius.circular(8),
+                        borderRadius: BorderRadius.circular(10),
                         child: SizedBox(
                           width: itemWidth,
                           height: itemWidth,

@@ -244,16 +244,13 @@ class GalleryTabState extends State<GalleryTab> {
                                       child: GestureDetector(
                                         onTap: () => _goToPage(index),
                                         child: Container(
-                                          padding: const EdgeInsets.symmetric(vertical: 8),
-                                          margin: const EdgeInsets.symmetric(horizontal: 2),
+                                          padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
+                                          margin: const EdgeInsets.symmetric(horizontal: 3),
                                           decoration: BoxDecoration(
                                             color: isSelected
-                                                ? const Color(0xFF7C4DFF).withAlpha(30)
-                                                : Colors.transparent,
-                                            borderRadius: BorderRadius.circular(20),
-                                            border: isSelected
-                                                ? Border.all(color: const Color(0xFF7C4DFF), width: 1.5)
-                                                : null,
+                                                ? const Color(0xFF7C4DFF)
+                                                : Colors.white.withAlpha(120),
+                                            borderRadius: BorderRadius.circular(14),
                                           ),
                                           child: Text(
                                             _formatShortMonth(_months[index]),
@@ -262,7 +259,7 @@ class GalleryTabState extends State<GalleryTab> {
                                               fontSize: 14,
                                               fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
                                               color: isSelected
-                                                  ? const Color(0xFF7C4DFF)
+                                                  ? Colors.white
                                                   : Colors.grey[700],
                                             ),
                                           ),

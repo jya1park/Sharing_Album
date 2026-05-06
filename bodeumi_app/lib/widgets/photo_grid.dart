@@ -121,7 +121,7 @@ class PhotoGridState extends State<PhotoGrid> {
               child: Padding(
                 padding: const EdgeInsets.all(2),
                 child: ClipRRect(
-                  borderRadius: BorderRadius.circular(4),
+                  borderRadius: BorderRadius.circular(8),
                   child: _buildItem(p, _idx(p)),
                 ),
               ),
@@ -142,7 +142,7 @@ class PhotoGridState extends State<PhotoGrid> {
         child: Padding(
           padding: const EdgeInsets.all(2),
           child: ClipRRect(
-            borderRadius: BorderRadius.circular(4),
+            borderRadius: BorderRadius.circular(8),
             child: _buildItem(video, _idx(video)),
           ),
         ),
@@ -165,7 +165,7 @@ class PhotoGridState extends State<PhotoGrid> {
             child: Padding(
               padding: const EdgeInsets.all(2),
               child: ClipRRect(
-                borderRadius: BorderRadius.circular(4),
+                borderRadius: BorderRadius.circular(8),
                 child: top,
               ),
             ),
@@ -175,7 +175,7 @@ class PhotoGridState extends State<PhotoGrid> {
             child: Padding(
               padding: const EdgeInsets.all(2),
               child: ClipRRect(
-                borderRadius: BorderRadius.circular(4),
+                borderRadius: BorderRadius.circular(8),
                 child: bottom,
               ),
             ),
