@@ -52,6 +52,14 @@ class GalleryTabState extends State<GalleryTab> {
     _loadMonths(preservePage: true);
   }
 
+  void _softReload() {
+    if (_months.isNotEmpty && _currentPage < _months.length) {
+      final month = _months[_currentPage];
+      _photoCache.remove(month);
+      _loadPhotosForPage(_currentPage);
+    }
+  }
+
   Future<void> _loadMonths({bool preservePage = false}) async {
     final previousMonth = (_months.isNotEmpty && _currentPage < _months.length)
         ? _months[_currentPage]
@@ -171,7 +179,7 @@ class GalleryTabState extends State<GalleryTab> {
         widget.onFavoriteChanged();
         return updated;
       },
-    ).then((_) => reload());
+    ).then((_) => _softReload());
   }
 
   @override
