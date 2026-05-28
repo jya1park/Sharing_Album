@@ -167,19 +167,24 @@ class GalleryTabState extends State<GalleryTab> {
   }
 
   void _openPhotoView(List<Photo> photos, int index) {
+    bool didModify = false;
     openMedia(
       context: context,
       photos: photos,
       index: index,
       onDelete: (photo) async {
         await ApiService.deletePhoto(photo.id);
+        didModify = true;
       },
       onFavoriteToggle: (photo) async {
         final updated = await ApiService.toggleFavorite(photo.id);
         widget.onFavoriteChanged();
+        didModify = true;
         return updated;
       },
-    ).then((_) => _softReload());
+    ).then((_) {
+      if (didModify) _softReload();
+    });
   }
 
   @override

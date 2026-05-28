@@ -336,11 +336,22 @@ class _PhotoViewScreenState extends State<PhotoViewScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, _) {
+        if (!didPop) {
+          Navigator.of(context).pop(_currentPhoto.id);
+        }
+      },
+      child: Scaffold(
       backgroundColor: Colors.black,
       appBar: AppBar(
         backgroundColor: Colors.black,
         foregroundColor: Colors.white,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          onPressed: () => Navigator.of(context).pop(_currentPhoto.id),
+        ),
         title: Text(
           '${_currentIndex + 1} / ${_photos.length}',
           style: const TextStyle(fontSize: 16),
@@ -407,6 +418,7 @@ class _PhotoViewScreenState extends State<PhotoViewScreen> {
         ),
         backgroundDecoration: const BoxDecoration(color: Colors.black),
       ),
+    ),
     );
   }
 }
