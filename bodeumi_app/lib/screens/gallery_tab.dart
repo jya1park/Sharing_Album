@@ -33,6 +33,8 @@ class GalleryTabState extends State<GalleryTab> {
   late PageController _pageController;
   int _currentPage = 0;
   bool _isLoading = true;
+  String? _scrollToPhotoId;
+  final Map<int, GlobalKey<PhotoGridState>> _gridKeys = {};
 
   @override
   void initState() {
@@ -182,8 +184,15 @@ class GalleryTabState extends State<GalleryTab> {
         didModify = true;
         return updated;
       },
-    ).then((_) {
-      if (didModify) _softReload();
+    ).then((result) {
+      final photoId = result as String?;
+      if (didModify) {
+        _softReload();
+      }
+      if (photoId != null && _currentPage < _months.length) {
+        final gridKey = _gridKeys[_currentPage];
+        gridKey?.currentState?.scrollToPhoto(photoId);
+      }
     });
   }
 
@@ -327,7 +336,9 @@ class GalleryTabState extends State<GalleryTab> {
                                 );
                               }
 
+                              _gridKeys.putIfAbsent(index, () => GlobalKey<PhotoGridState>());
                               return PhotoGrid(
+                                key: _gridKeys[index],
                                 photos: photos,
                                 onTap: (i) => _openPhotoView(photos, i),
                                 onRefresh: () async {

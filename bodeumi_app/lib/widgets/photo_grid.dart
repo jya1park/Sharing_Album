@@ -27,6 +27,85 @@ class PhotoGrid extends StatefulWidget {
 class PhotoGridState extends State<PhotoGrid> {
   final Set<String> _selectedIds = {};
   bool _isSelecting = false;
+  final ScrollController _scrollController = ScrollController();
+
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  void scrollToPhoto(String photoId) {
+    final index = widget.photos.indexWhere((p) => p.id == photoId);
+    if (index < 0) return;
+
+    // Estimate row position: count items before this photo
+    int rowCount = 0;
+    int counted = 0;
+    final photoQueue = <int>[];
+    final videoQueue = <int>[];
+    for (int i = 0; i < widget.photos.length; i++) {
+      if (widget.photos[i].isVideo) {
+        videoQueue.add(i);
+      } else {
+        photoQueue.add(i);
+      }
+    }
+
+    int vi = 0, pi = 0;
+    while (vi < videoQueue.length || pi < photoQueue.length) {
+      bool nextIsVideo = false;
+      if (vi < videoQueue.length && pi < photoQueue.length) {
+        nextIsVideo = videoQueue[vi] < photoQueue[pi];
+      } else if (vi < videoQueue.length) {
+        nextIsVideo = true;
+      }
+
+      if (nextIsVideo) {
+        final vidIdx = videoQueue[vi++];
+        int sideCount = 0;
+        while (sideCount < 2 && pi < photoQueue.length) {
+          if (photoQueue[pi] == index || vidIdx == index) {
+            _doScroll(rowCount);
+            return;
+          }
+          pi++;
+          sideCount++;
+        }
+        if (vidIdx == index) {
+          _doScroll(rowCount);
+          return;
+        }
+        rowCount++;
+      } else {
+        int rowSize = 0;
+        while (rowSize < 3 && pi < photoQueue.length) {
+          if (photoQueue[pi] == index) {
+            _doScroll(rowCount);
+            return;
+          }
+          pi++;
+          rowSize++;
+        }
+        rowCount++;
+      }
+    }
+  }
+
+  void _doScroll(int rowIndex) {
+    final screenWidth = MediaQuery.of(context).size.width;
+    final itemHeight = screenWidth / 3;
+    final offset = rowIndex * itemHeight;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (_scrollController.hasClients) {
+        _scrollController.animateTo(
+          offset.clamp(0, _scrollController.position.maxScrollExtent),
+          duration: const Duration(milliseconds: 300),
+          curve: Curves.easeOut,
+        );
+      }
+    });
+  }
 
   void clearSelection() {
     setState(() {
@@ -324,6 +403,7 @@ class PhotoGridState extends State<PhotoGrid> {
           child: RefreshIndicator(
             onRefresh: widget.onRefresh,
             child: ListView(
+              controller: _scrollController,
               physics: const AlwaysScrollableScrollPhysics(),
               padding: const EdgeInsets.all(2),
               children: _buildRows(),
