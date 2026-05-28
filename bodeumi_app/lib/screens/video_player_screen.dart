@@ -13,15 +13,19 @@ import '../services/api_service.dart';
 import '../services/auth_service.dart';
 
 class VideoPlayerScreen extends StatefulWidget {
-  final Photo photo;
+  final List<Photo> allMedia;
+  final int initialIndex;
   final Future<void> Function(Photo photo) onDelete;
   final Future<Photo> Function(Photo photo) onFavoriteToggle;
+  final void Function(int index)? onSwitchToPhoto;
 
   const VideoPlayerScreen({
     super.key,
-    required this.photo,
+    required this.allMedia,
+    required this.initialIndex,
     required this.onDelete,
     required this.onFavoriteToggle,
+    this.onSwitchToPhoto,
   });
 
   @override
@@ -31,13 +35,15 @@ class VideoPlayerScreen extends StatefulWidget {
 class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
   late VideoPlayerController _videoController;
   ChewieController? _chewieController;
+  late int _currentIndex;
   late Photo _photo;
   bool _isDownloading = false;
 
   @override
   void initState() {
     super.initState();
-    _photo = widget.photo;
+    _currentIndex = widget.initialIndex;
+    _photo = widget.allMedia[_currentIndex];
     _initVideo();
   }
 
@@ -65,12 +71,42 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
     if (mounted) setState(() {});
   }
 
+  Future<void> _switchTo(int newIndex) async {
+    final newPhoto = widget.allMedia[newIndex];
+
+    if (!newPhoto.isVideo) {
+      // Switch back to photo viewer at this index
+      _chewieController?.dispose();
+      _videoController.dispose();
+      if (mounted) {
+        Navigator.of(context).pop(newPhoto.id);
+        widget.onSwitchToPhoto?.call(newIndex);
+      }
+      return;
+    }
+
+    // Switch to another video
+    _chewieController?.dispose();
+    _videoController.dispose();
+    _chewieController = null;
+
+    setState(() {
+      _currentIndex = newIndex;
+      _photo = newPhoto;
+    });
+
+    await _initVideo();
+  }
+
   @override
   void dispose() {
     _chewieController?.dispose();
     _videoController.dispose();
     super.dispose();
   }
+
+  bool get _hasPrev => _currentIndex > 0;
+  bool get _hasNext => _currentIndex < widget.allMedia.length - 1;
 
   Future<void> _toggleFavorite() async {
     try {
@@ -153,7 +189,7 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
               try {
                 await widget.onDelete(_photo);
                 if (mounted) {
-                  navigator.pop();
+                  navigator.pop(_photo.id);
                   messenger.showSnackBar(
                     const SnackBar(content: Text('삭제 완료'), backgroundColor: Colors.green),
                   );
@@ -175,45 +211,101 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.black,
-      appBar: AppBar(
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, _) {
+        if (!didPop) {
+          Navigator.of(context).pop(_photo.id);
+        }
+      },
+      child: Scaffold(
         backgroundColor: Colors.black,
-        foregroundColor: Colors.white,
-        title: Text(
-          _photo.originalFilename,
-          style: const TextStyle(fontSize: 14),
-          overflow: TextOverflow.ellipsis,
-        ),
-        actions: [
-          if (AuthService.canDelete || AuthService.isAdmin)
-            IconButton(
-              icon: const Icon(Icons.delete_outline),
-              onPressed: _showDeleteDialog,
-            ),
-          IconButton(
-            icon: Icon(
-              _photo.isFavorite ? Icons.favorite : Icons.favorite_border,
-              color: _photo.isFavorite ? Colors.redAccent : Colors.white,
-            ),
-            onPressed: _toggleFavorite,
+        appBar: AppBar(
+          backgroundColor: Colors.black,
+          foregroundColor: Colors.white,
+          leading: IconButton(
+            icon: const Icon(Icons.arrow_back),
+            onPressed: () => Navigator.of(context).pop(_photo.id),
           ),
-          if (AuthService.canDownload)
+          title: Text(
+            '${_currentIndex + 1} / ${widget.allMedia.length}',
+            style: const TextStyle(fontSize: 14),
+          ),
+          centerTitle: true,
+          actions: [
+            if (AuthService.canDelete || AuthService.isAdmin)
+              IconButton(
+                icon: const Icon(Icons.delete_outline),
+                onPressed: _showDeleteDialog,
+              ),
             IconButton(
-              icon: _isDownloading
-                  ? const SizedBox(
-                      width: 20, height: 20,
-                      child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
-                    )
-                  : const Icon(Icons.download),
-              onPressed: _isDownloading ? null : _downloadVideo,
+              icon: Icon(
+                _photo.isFavorite ? Icons.favorite : Icons.favorite_border,
+                color: _photo.isFavorite ? Colors.redAccent : Colors.white,
+              ),
+              onPressed: _toggleFavorite,
             ),
-        ],
-      ),
-      body: Center(
-        child: _chewieController != null
-            ? Chewie(controller: _chewieController!)
-            : const CircularProgressIndicator(color: Colors.white),
+            if (AuthService.canDownload)
+              IconButton(
+                icon: _isDownloading
+                    ? const SizedBox(
+                        width: 20, height: 20,
+                        child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
+                      )
+                    : const Icon(Icons.download),
+                onPressed: _isDownloading ? null : _downloadVideo,
+              ),
+          ],
+        ),
+        body: Stack(
+          children: [
+            Center(
+              child: _chewieController != null
+                  ? Chewie(controller: _chewieController!)
+                  : const CircularProgressIndicator(color: Colors.white),
+            ),
+            // Previous button
+            if (_hasPrev)
+              Positioned(
+                left: 0,
+                top: 0,
+                bottom: 0,
+                child: Center(
+                  child: IconButton(
+                    icon: Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: Colors.black.withAlpha(100),
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(Icons.chevron_left, color: Colors.white, size: 28),
+                    ),
+                    onPressed: () => _switchTo(_currentIndex - 1),
+                  ),
+                ),
+              ),
+            // Next button
+            if (_hasNext)
+              Positioned(
+                right: 0,
+                top: 0,
+                bottom: 0,
+                child: Center(
+                  child: IconButton(
+                    icon: Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: Colors.black.withAlpha(100),
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(Icons.chevron_right, color: Colors.white, size: 28),
+                    ),
+                    onPressed: () => _switchTo(_currentIndex + 1),
+                  ),
+                ),
+              ),
+          ],
+        ),
       ),
     );
   }

@@ -400,44 +400,94 @@ class _PhotoViewScreenState extends State<PhotoViewScreen> {
           ),
         ],
       ),
-      body: PhotoViewGallery.builder(
-        pageController: _pageController,
-        itemCount: _photos.length,
-        onPageChanged: (index) {
-          setState(() => _currentIndex = index);
-          if (_photos[index].isVideo && widget.onOpenVideo != null) {
-            widget.onOpenVideo!(_photos[index]);
-          }
-        },
-        builder: (context, index) {
-          final photo = _photos[index];
-          if (photo.isVideo) {
-            return PhotoViewGalleryPageOptions.customChild(
+      body: Stack(
+        children: [
+          PhotoViewGallery.builder(
+            pageController: _pageController,
+            itemCount: _photos.length,
+            onPageChanged: (index) {
+              setState(() => _currentIndex = index);
+              if (_photos[index].isVideo && widget.onOpenVideo != null) {
+                widget.onOpenVideo!(_photos[index]);
+              }
+            },
+            builder: (context, index) {
+              final photo = _photos[index];
+              if (photo.isVideo) {
+                return PhotoViewGalleryPageOptions.customChild(
+                  child: Center(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.play_circle_outline, size: 80, color: Colors.white.withAlpha(180)),
+                        const SizedBox(height: 12),
+                        const Text('탭하여 재생', style: TextStyle(color: Colors.white70, fontSize: 14)),
+                      ],
+                    ),
+                  ),
+                );
+              }
+              return PhotoViewGalleryPageOptions(
+                imageProvider: CachedNetworkImageProvider(
+                  ApiService.imageUrl(photo.originalUrl),
+                ),
+                heroAttributes: PhotoViewHeroAttributes(tag: 'photo_${photo.id}'),
+                minScale: PhotoViewComputedScale.contained,
+                maxScale: PhotoViewComputedScale.covered * 3,
+              );
+            },
+            loadingBuilder: (context, event) => const Center(
+              child: CircularProgressIndicator(color: Colors.white),
+            ),
+            backgroundDecoration: const BoxDecoration(color: Colors.black),
+          ),
+          // Previous button
+          if (_currentIndex > 0)
+            Positioned(
+              left: 0,
+              top: 0,
+              bottom: 0,
               child: Center(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(Icons.play_circle_outline, size: 80, color: Colors.white.withAlpha(180)),
-                    const SizedBox(height: 12),
-                    const Text('탭하여 재생', style: TextStyle(color: Colors.white70, fontSize: 14)),
-                  ],
+                child: IconButton(
+                  icon: Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: Colors.black.withAlpha(100),
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(Icons.chevron_left, color: Colors.white, size: 28),
+                  ),
+                  onPressed: () => _pageController.previousPage(
+                    duration: const Duration(milliseconds: 300),
+                    curve: Curves.easeInOut,
+                  ),
                 ),
               ),
-            );
-          }
-          return PhotoViewGalleryPageOptions(
-            imageProvider: CachedNetworkImageProvider(
-              ApiService.imageUrl(photo.originalUrl),
             ),
-            heroAttributes: PhotoViewHeroAttributes(tag: 'photo_${photo.id}'),
-            minScale: PhotoViewComputedScale.contained,
-            maxScale: PhotoViewComputedScale.covered * 3,
-          );
-        },
-        loadingBuilder: (context, event) => const Center(
-          child: CircularProgressIndicator(color: Colors.white),
-        ),
-        backgroundDecoration: const BoxDecoration(color: Colors.black),
+          // Next button
+          if (_currentIndex < _photos.length - 1)
+            Positioned(
+              right: 0,
+              top: 0,
+              bottom: 0,
+              child: Center(
+                child: IconButton(
+                  icon: Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: Colors.black.withAlpha(100),
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(Icons.chevron_right, color: Colors.white, size: 28),
+                  ),
+                  onPressed: () => _pageController.nextPage(
+                    duration: const Duration(milliseconds: 300),
+                    curve: Curves.easeInOut,
+                  ),
+                ),
+              ),
+            ),
+        ],
       ),
     ),
     );

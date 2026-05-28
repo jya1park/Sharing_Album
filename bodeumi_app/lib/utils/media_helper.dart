@@ -18,9 +18,39 @@ Future<dynamic> openMedia({
       context,
       MaterialPageRoute(
         builder: (context) => VideoPlayerScreen(
-          photo: photo,
+          allMedia: photos,
+          initialIndex: index,
           onDelete: onDelete,
           onFavoriteToggle: onFavoriteToggle,
+          onSwitchToPhoto: (newIndex) {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => PhotoViewScreen(
+                  photos: photos,
+                  initialIndex: newIndex,
+                  onDelete: onDelete,
+                  onFavoriteToggle: onFavoriteToggle,
+                  onOpenVideo: (videoPhoto) {
+                    final vidIdx = photos.indexWhere((p) => p.id == videoPhoto.id);
+                    if (vidIdx >= 0) {
+                      Navigator.pushReplacement(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => VideoPlayerScreen(
+                            allMedia: photos,
+                            initialIndex: vidIdx,
+                            onDelete: onDelete,
+                            onFavoriteToggle: onFavoriteToggle,
+                          ),
+                        ),
+                      );
+                    }
+                  },
+                ),
+              ),
+            );
+          },
         ),
       ),
     );
@@ -36,16 +66,23 @@ Future<dynamic> openMedia({
           onDelete: onDelete,
           onFavoriteToggle: onFavoriteToggle,
           onOpenVideo: (videoPhoto) {
-            Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (context) => VideoPlayerScreen(
-                  photo: videoPhoto,
-                  onDelete: onDelete,
-                  onFavoriteToggle: onFavoriteToggle,
+            final vidIdx = photos.indexWhere((p) => p.id == videoPhoto.id);
+            if (vidIdx >= 0) {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => VideoPlayerScreen(
+                    allMedia: photos,
+                    initialIndex: vidIdx,
+                    onDelete: onDelete,
+                    onFavoriteToggle: onFavoriteToggle,
+                    onSwitchToPhoto: (newIndex) {
+                      Navigator.of(context).pop(photos[newIndex].id);
+                    },
+                  ),
                 ),
-              ),
-            );
+              );
+            }
           },
         ),
       ),
