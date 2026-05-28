@@ -18,6 +18,7 @@ class PhotoViewScreen extends StatefulWidget {
   final int initialIndex;
   final Future<void> Function(Photo photo) onDelete;
   final Future<Photo> Function(Photo photo) onFavoriteToggle;
+  final void Function(Photo photo)? onOpenVideo;
 
   const PhotoViewScreen({
     super.key,
@@ -25,6 +26,7 @@ class PhotoViewScreen extends StatefulWidget {
     required this.initialIndex,
     required this.onDelete,
     required this.onFavoriteToggle,
+    this.onOpenVideo,
   });
 
   @override
@@ -401,9 +403,28 @@ class _PhotoViewScreenState extends State<PhotoViewScreen> {
       body: PhotoViewGallery.builder(
         pageController: _pageController,
         itemCount: _photos.length,
-        onPageChanged: (index) => setState(() => _currentIndex = index),
+        onPageChanged: (index) {
+          setState(() => _currentIndex = index);
+          if (_photos[index].isVideo && widget.onOpenVideo != null) {
+            widget.onOpenVideo!(_photos[index]);
+          }
+        },
         builder: (context, index) {
           final photo = _photos[index];
+          if (photo.isVideo) {
+            return PhotoViewGalleryPageOptions.customChild(
+              child: Center(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.play_circle_outline, size: 80, color: Colors.white.withAlpha(180)),
+                    const SizedBox(height: 12),
+                    const Text('탭하여 재생', style: TextStyle(color: Colors.white70, fontSize: 14)),
+                  ],
+                ),
+              ),
+            );
+          }
           return PhotoViewGalleryPageOptions(
             imageProvider: CachedNetworkImageProvider(
               ApiService.imageUrl(photo.originalUrl),
