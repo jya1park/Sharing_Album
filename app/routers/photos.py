@@ -8,6 +8,7 @@ from pathlib import Path
 
 from fastapi import APIRouter, Depends, Form, HTTPException, Query, UploadFile, File, status
 from fastapi.responses import FileResponse
+from starlette.background import BackgroundTask
 from PIL import Image
 from sqlmodel import Session, select
 
@@ -335,6 +336,7 @@ async def get_photo_file(
             path=str(tmp_path),
             media_type=media_type,
             filename=photo.original_filename,
+            background=BackgroundTask(tmp_path.unlink, missing_ok=True),
         )
 
     raise HTTPException(status_code=404, detail="File not found")
