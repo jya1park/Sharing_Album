@@ -47,9 +47,11 @@ def download_original(dest_key: str) -> Path | None:
 
 
 def get_original_path(dest_key: str) -> Path | None:
-    """Get local path for original file. Returns None if using GCS."""
-    if USE_GCS:
-        return None
+    """Get local path for original file, if it exists on local disk.
+
+    Photos uploaded before GCS was enabled were saved locally even though
+    USE_GCS is now True, so this must check disk regardless of USE_GCS.
+    """
     path = PHOTOS_DIR / dest_key
     return path if path.exists() else None
 
