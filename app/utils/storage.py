@@ -1,12 +1,14 @@
-import mimetypes
 import shutil
-import tempfile
+import mimetypes
+from collections.abc import Iterator
 from pathlib import Path
 
 from app.config import PHOTOS_DIR, GCS_BUCKET, USE_GCS
 
 _gcs_client = None
 _gcs_bucket = None
+
+STREAM_CHUNK_SIZE = 1024 * 1024
 
 
 def _get_bucket():
@@ -16,6 +18,10 @@ def _get_bucket():
         _gcs_client = storage.Client()
         _gcs_bucket = _gcs_client.bucket(GCS_BUCKET)
     return _gcs_bucket
+
+
+def storage_mode() -> str:
+    return "gcs" if USE_GCS else "local"
 
 
 def save_original(source_path: Path, dest_key: str) -> None:
@@ -32,35 +38,36 @@ def save_original(source_path: Path, dest_key: str) -> None:
             shutil.copy2(str(source_path), str(dest_path))
 
 
-def download_original(dest_key: str) -> Path | None:
-    """Download original file from GCS to a temp file. Returns temp path or None."""
-    if USE_GCS:
-        bucket = _get_bucket()
-        blob = bucket.blob(dest_key)
-        if not blob.exists():
-            return None
-        ext = dest_key.rsplit(".", 1)[-1] if "." in dest_key else "bin"
-        tmp = tempfile.NamedTemporaryFile(delete=False, suffix=f".{ext}")
-        blob.download_to_filename(tmp.name)
-        return Path(tmp.name)
-    return None
-
-
 def get_original_path(dest_key: str) -> Path | None:
-    """Get local path for original file. Returns None if using GCS."""
-    if USE_GCS:
-        return None
+    """Get local path for original file, if a local copy exists (in any mode)."""
     path = PHOTOS_DIR / dest_key
     return path if path.exists() else None
 
 
+def get_gcs_original_size(dest_key: str) -> int | None:
+    """Return size of the original in GCS, or None if missing / GCS disabled."""
+    if not USE_GCS:
+        return None
+    blob = _get_bucket().get_blob(dest_key)
+    return blob.size if blob is not None else None
+
+
+def stream_gcs_original(dest_key: str, start: int, end: int) -> Iterator[bytes]:
+    """Yield bytes [start, end] (inclusive) of a GCS original, chunk by chunk."""
+    blob = _get_bucket().blob(dest_key)
+    pos = start
+    while pos <= end:
+        chunk_end = min(pos + STREAM_CHUNK_SIZE - 1, end)
+        yield blob.download_as_bytes(start=pos, end=chunk_end)
+        pos = chunk_end + 1
+
+
 def delete_original(dest_key: str) -> None:
-    """Delete original file from GCS or local disk."""
+    """Delete any local copy of the original, then the GCS copy."""
+    file_path = PHOTOS_DIR / dest_key
+    if file_path.exists():
+        file_path.unlink()
     if USE_GCS:
         bucket = _get_bucket()
         blob = bucket.blob(dest_key)
         blob.delete()
-    else:
-        file_path = PHOTOS_DIR / dest_key
-        if file_path.exists():
-            file_path.unlink()

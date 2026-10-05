@@ -237,17 +237,16 @@ cd Sharing_Album
 git checkout claude/photo-sharing-app-AeoVf
 mkdir -p data
 
-# 3. Docker 빌드 + 실행
-sudo docker build -t bodeumi .
-sudo docker run -d --name bodeumi -p 8000:8000 \
-  -v $(pwd)/data:/data \
-  -e GCS_BUCKET=bodme-photo \
-  --restart always bodeumi
+# 3. Docker 빌드 + 실행 (GCS_BUCKET=bodme-photo 포함)
+bash deploy/run.sh
 
-# 4. 확인
-sudo docker ps
+# 4. 확인 - "storage": "gcs" 여야 함
 curl http://localhost:8000/health
 ```
+
+> ⚠️ `docker run` 을 직접 입력하지 말고 항상 `deploy/run.sh` 를 사용하세요.
+> `GCS_BUCKET` 없이 컨테이너를 띄우면 원본이 GCS 대신 VM 디스크에 저장되어
+> 디스크가 가득 차고 업로드가 실패합니다 (2026년 7~10월 장애 원인).
 
 ### 앱 빌드 (PC)
 
@@ -265,13 +264,19 @@ APK 위치: `build/app/outputs/flutter-apk/bodme.apk`
 ```bash
 cd ~/Sharing_Album
 git pull origin claude/photo-sharing-app-AeoVf
-sudo docker stop bodeumi && sudo docker rm bodeumi
-sudo docker build -t bodeumi .
-sudo docker run -d --name bodeumi -p 8000:8000 \
-  -v $(pwd)/data:/data \
-  -e GCS_BUCKET=bodme-photo \
-  --restart always bodeumi
+bash deploy/run.sh
 ```
+
+### 상태 점검
+
+```bash
+curl http://localhost:8000/health
+# {"status":"ok","storage":"gcs","gcs_bucket":"bodme-photo","disk_free_gb":10.5}
+df -h /
+```
+
+- `storage` 가 `local` 이면 GCS 설정이 빠진 것 → `bash deploy/run.sh` 로 다시 띄우기
+- 서버 시작 로그(`sudo docker logs bodeumi`)에도 저장 방식이 표시됩니다
 
 ### 백업
 
@@ -300,7 +305,7 @@ VM (로컬)                    GCS (gs://bodme-photo)
 
 | 파일 | 저장 위치 | 설명 |
 |------|----------|------|
-| 원본 사진/동영상 | GCS | $0.02/GB/월 |
+| 원본 사진/동영상 | GCS | $0.02/GB/월 (VM에는 남기지 않음, 업로드 중 임시 파일만) |
 | 썸네일 | VM 로컬 | 빠른 로딩 |
 | DB | VM 로컬 | 메타데이터, 사용자 정보 |
 
@@ -312,5 +317,5 @@ VM (로컬)                    GCS (gs://bodme-photo)
 |------|---------|
 | VM (e2-small) | ~$15 |
 | GCS 저장소 | $0.02/GB |
-| 디스크 (30GB) | ~$1.2 |
+| 디스크 (20GB) | ~$2 |
 | **합계** | **~$17~20** |

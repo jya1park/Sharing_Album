@@ -5,9 +5,11 @@ import tempfile
 import uuid
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
+from urllib.parse import quote
 
-from fastapi import APIRouter, Depends, Form, HTTPException, Query, UploadFile, File, status
-from fastapi.responses import FileResponse
+from fastapi import APIRouter, Depends, Form, HTTPException, Query, Request, UploadFile, File, status
+from fastapi.concurrency import run_in_threadpool
+from fastapi.responses import FileResponse, StreamingResponse
 from PIL import Image
 from sqlmodel import Session, select
 
@@ -16,6 +18,7 @@ from app.config import (
     MAX_FILE_SIZE_BYTES,
     ALLOWED_EXTENSIONS,
     ALLOWED_VIDEO_EXTENSIONS,
+    USE_GCS,
 )
 from app.auth import get_current_user
 from app.database import get_session
@@ -24,7 +27,13 @@ from app.schemas import PhotoResponse, PhotoListResponse, MonthListResponse, Mes
 from app.utils.exif import extract_taken_date
 from app.utils.image import compress_and_resize, generate_thumbnail
 from app.utils.video import generate_video_thumbnail
-from app.utils.storage import save_original, download_original, get_original_path, delete_original
+from app.utils.storage import (
+    save_original,
+    get_original_path,
+    get_gcs_original_size,
+    stream_gcs_original,
+    delete_original,
+)
 
 router = APIRouter()
 
@@ -114,6 +123,7 @@ async def upload_photo(
         tmp_path.unlink(missing_ok=True)
         raise HTTPException(status_code=409, detail="This file has already been uploaded")
 
+    original_path: Path | None = None
     try:
         now = datetime.now(timezone(timedelta(hours=9))).replace(tzinfo=None)
         taken_at = None
@@ -148,11 +158,14 @@ async def upload_photo(
             generate_video_thumbnail(tmp_path, thumbnail_path)
         else:
             file_size = compress_and_resize(tmp_path, original_path)
-            save_original(original_path, original_key)
             generate_thumbnail(original_path, thumbnail_path)
+            save_original(original_path, original_key)
 
     finally:
         tmp_path.unlink(missing_ok=True)
+        # With GCS, the compressed photo is only a staging copy - don't keep it on the VM disk
+        if USE_GCS and original_path is not None:
+            original_path.unlink(missing_ok=True)
 
     photo = Photo(
         filename=stored_name,
@@ -303,6 +316,7 @@ async def get_photo(
 @router.get("/{photo_id}/file")
 async def get_photo_file(
     photo_id: str,
+    request: Request,
     type: str = Query("original", pattern=r"^(original|thumbnail)$"),
     session: Session = Depends(get_session),
 ):
@@ -327,17 +341,60 @@ async def get_photo_file(
             filename=photo.original_filename,
         )
 
-    # Download from GCS to temp file and serve
-    tmp_path = download_original(photo.file_path)
-    if tmp_path:
-        media_type = mimetypes.guess_type(str(tmp_path))[0] or "application/octet-stream"
-        return FileResponse(
-            path=str(tmp_path),
-            media_type=media_type,
-            filename=photo.original_filename,
-        )
+    # Stream from GCS without a temp file, honoring Range requests (video seeking)
+    file_size = await run_in_threadpool(get_gcs_original_size, photo.file_path)
+    if file_size is None:
+        raise HTTPException(status_code=404, detail="File not found")
 
-    raise HTTPException(status_code=404, detail="File not found")
+    media_type = mimetypes.guess_type(photo.file_path)[0] or "application/octet-stream"
+    headers = {
+        "Accept-Ranges": "bytes",
+        "Content-Disposition": f"attachment; filename*=utf-8''{quote(photo.original_filename)}",
+    }
+
+    byte_range = _parse_range(request.headers.get("range"), file_size)
+    if byte_range is None:
+        start, end = 0, file_size - 1
+        status_code = 200
+    else:
+        start, end = byte_range
+        status_code = 206
+        headers["Content-Range"] = f"bytes {start}-{end}/{file_size}"
+    headers["Content-Length"] = str(end - start + 1)
+
+    return StreamingResponse(
+        stream_gcs_original(photo.file_path, start, end),
+        status_code=status_code,
+        media_type=media_type,
+        headers=headers,
+    )
+
+
+def _parse_range(range_header: str | None, file_size: int) -> tuple[int, int] | None:
+    """Parse a single 'bytes=start-end' Range header. None means serve the whole file."""
+    if not range_header or not range_header.startswith("bytes=") or "," in range_header:
+        return None
+    start_s, _, end_s = range_header[len("bytes="):].strip().partition("-")
+    try:
+        if start_s == "":
+            # Suffix range: last N bytes
+            length = int(end_s)
+            if length <= 0:
+                raise ValueError
+            start, end = max(file_size - length, 0), file_size - 1
+        else:
+            start = int(start_s)
+            end = int(end_s) if end_s else file_size - 1
+    except ValueError:
+        return None
+    end = min(end, file_size - 1)
+    if start > end:
+        raise HTTPException(
+            status_code=416,
+            detail="Requested range not satisfiable",
+            headers={"Content-Range": f"bytes */{file_size}"},
+        )
+    return start, end
 
 
 @router.delete("/{photo_id}", response_model=MessageResponse)
