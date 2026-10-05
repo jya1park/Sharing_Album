@@ -1,4 +1,4 @@
 class AppConfig {
-  // TODO: 배포 시 실제 서버 IP로 변경
-  static const String baseUrl = 'http://34.64.135.188:8000';
+  // GCP VM(bodme) 외부 IP. VM IP가 바뀌면 여기를 수정 후 앱 재빌드
+  static const String baseUrl = 'http://34.50.51.34:8000';
 }
